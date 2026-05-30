@@ -370,7 +370,7 @@ async function sendRoleClaimMessage(guild) {
 }
 
 // ============================================
-// COMMAND INFO EMBED - ALLE COMMANDS IN ENGELS (16 FIELDS)
+// COMMAND INFO EMBED - ALLEEN COMMANDS
 // ============================================
 async function sendCommandInfoMessage(guild) {
     const channel = guild.channels.cache.get(CONFIG.ROLE_INFO_CHANNEL_ID);
@@ -382,44 +382,28 @@ async function sendCommandInfoMessage(guild) {
     await channel.bulkDelete(await channel.messages.fetch()).catch(() => {});
     
     const embed = new EmbedBuilder()
-        .setTitle('📜 **COMMAND INFORMATION**')
-        .setDescription('Here is an overview of all available commands and what they do.')
+        .setTitle('📜 **COMMAND LIST**')
+        .setDescription('Here is an overview of all available commands.')
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **TICKET COMMANDS** ⬇️', inline: false },
-            { name: '🎫 **Create Ticket**', value: 'Click the button in <#' + CONFIG.TICKET_CREATION_CHANNEL_ID + '> to create a ticket.\nChoose from: General Question, Purchase, or Buy Support.', inline: false },
-            { name: '🎯 **Claim / Close / Transcript**', value: 'Use the buttons in your ticket channel to claim, close, or get a transcript.', inline: false },
-            
-            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ADMIN COMMANDS** ⬇️', inline: false },
-            { name: '📝 `/send`', value: 'Open a modal to send a message as the bot. Supports multi-line messages with Shift+Enter.', inline: false },
-            { name: '🛒 `/product`', value: 'Create a product embed with name, stock (yes/no), price, description, and image.', inline: false },
-            { name: '🗑️ `/clear`', value: 'Clear messages from a channel. Usage: `/clear <amount>` (1-100 messages).', inline: false },
-            { name: '⭐ `/review`', value: 'Leave a review for a product. Usage: `/review <stars> <product> <review>`', inline: false },
-            { name: '📦 `/createpurchase`', value: 'Create a digital product for sale. Add text content or attach a file.', inline: false },
-            { name: '🎁 `/purchase`', value: 'Purchase a product for a user. Select the product from a dropdown menu.', inline: false },
-            { name: '✅ `/verifyall`', value: 'Verify ALL members in the server. Adds verified role, removes unverified role.', inline: false },
-            
-            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ACCOUNT STORAGE COMMANDS** ⬇️', inline: false },
-            { name: '➕ `/addaccount`', value: 'Add an account to storage. Usage: `/addaccount type:<discord/steam/fivem> account:<details>`', inline: false },
-            { name: '🎁 `/giveaccount`', value: 'Give random account(s) to a user. Choose category, then enter amount.', inline: false },
-            { name: '🎁 `/givebundle`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account) to a user.', inline: false },
-            { name: '🔄 **Refresh & Export**', value: 'Click **Refresh** to update storage display. Click **Export** to download all accounts.', inline: false },
-            
-            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ROLE CLAIM** ⬇️', inline: false },
-            { name: '🎭 **Claim Roles**', value: `Go to <#${CONFIG.ROLE_CLAIM_CHANNEL_ID}> and click the buttons to claim or remove roles.\nAvailable: Spoof Accounts, Trigger Shop, Scripts, Cheats/Software, IRL-Trading`, inline: false },
-            { name: '✅ **Claim All / Remove All**', value: 'Use the green button to claim all roles, red button to remove all roles.', inline: false },
-            
-            { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **VERIFICATION** ⬇️', inline: false },
-            { name: '✅ **Verify Yourself**', value: `Go to <#${CONFIG.VERIFICATION_CHANNEL_ID}> and click the **"Verify Me"** button to access all channels.`, inline: false }
+            { name: '📝 `/send`', value: 'Send a message as the bot (opens a modal, Shift+Enter for new line)', inline: false },
+            { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
+            { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
+            { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
+            { name: '📦 `/createpurchase <name> <content> [file]`', value: 'Create a digital product for sale', inline: false },
+            { name: '🎁 `/purchase <user>`', value: 'Purchase a product for a user (select from dropdown)', inline: false },
+            { name: '✅ `/verifyall`', value: 'Verify ALL members in the server', inline: false },
+            { name: '➕ `/addaccount <type> <account>`', value: 'Add an account to storage (types: discord/steam/fivem)', inline: false },
+            { name: '🎁 `/giveaccount <user>`', value: 'Give random account(s) to a user (choose category + amount)', inline: false },
+            { name: '🎁 `/givebundle <user>`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account)', inline: false }
         )
-        .setFooter({ text: 'Use these commands to manage the server efficiently' })
+        .setFooter({ text: `Total commands: 10 | Use /help for more info` })
         .setTimestamp();
     
     await channel.send({ embeds: [embed] });
     console.log('✅ Command info embed sent!');
 }
-
 // ============================================
 // VERIFICATION SYSTEM
 // ============================================
