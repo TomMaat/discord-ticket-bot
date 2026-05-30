@@ -398,12 +398,13 @@ async function sendCommandInfoMessage(guild) {
             { name: '🎁 `/giveaccount <user>`', value: 'Give random account(s) to a user (choose category + amount)', inline: false },
             { name: '🎁 `/givebundle <user>`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account)', inline: false }
         )
-        .setFooter({ text: `Total commands: 10 | Use /help for more info` })
+        .setFooter({ text: `Total commands: 10` })
         .setTimestamp();
     
     await channel.send({ embeds: [embed] });
     console.log('✅ Command info embed sent!');
 }
+
 // ============================================
 // VERIFICATION SYSTEM
 // ============================================
@@ -542,9 +543,9 @@ async function sendTranscript(channel, interaction) {
 async function verifyAllMembers(interaction) {
     const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
     const unverifiedRole = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
-    if (!verifiedRole) return interaction.reply({ content: '❌ Verified role not configured!', flags: 64 });
+    if (!verifiedRole) return interaction.reply({ content: '❌ Verified role not configured!' });
     
-    await interaction.reply({ content: '🔄 **Verifying all members...** This may take a while.', flags: 64 });
+    await interaction.reply({ content: '🔄 **Verifying all members...** This may take a while.' });
     
     let verifiedCount = 0, alreadyVerifiedCount = 0, failedCount = 0;
     await interaction.guild.members.fetch();
@@ -578,7 +579,6 @@ async function verifyAllMembers(interaction) {
         .setTimestamp();
     
     await interaction.editReply({ content: null, embeds: [resultEmbed] });
-    setTimeout(() => interaction.deleteReply().catch(() => {}), 10000);
 }
 
 // ============================================
@@ -664,10 +664,9 @@ client.once('ready', async () => {
         await sendCommandInfoMessage(guild);
         await updateAllStorageDisplays();
         
-        // Auto-refresh storage displays elke 5 minuten (300000 ms) in plaats van 30 seconden
         setInterval(async () => {
             await updateAllStorageDisplays();
-        }, 60000);
+        }, 300000);
     }
     console.log('✅ Bot is fully ready!');
     const stats = await getStorageStats();
@@ -683,7 +682,7 @@ client.on('interactionCreate', async (interaction) => {
     // /send command
     if (interaction.commandName === 'send') {
         if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            return interaction.reply({ content: '❌ No permission.' });
         }
         const modal = new ModalBuilder()
             .setCustomId('send_message_modal')
@@ -705,7 +704,7 @@ client.on('interactionCreate', async (interaction) => {
     // /product command
     if (interaction.commandName === 'product') {
         if (!interaction.member.roles.cache.has(CONFIG.PRODUCT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            return interaction.reply({ content: '❌ No permission.' });
         }
         const name = interaction.options.getString('name');
         const inStock = interaction.options.getString('instock') === 'yes';
@@ -736,25 +735,23 @@ client.on('interactionCreate', async (interaction) => {
         client.products.set(btnId, { name, price });
         
         await interaction.channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: '✅ Product posted!', flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 1000);
+        await interaction.reply({ content: '✅ Product posted!' });
     }
     
     // /clear command
     if (interaction.commandName === 'clear') {
         if (!interaction.member.roles.cache.has(CONFIG.CLEAR_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            return interaction.reply({ content: '❌ No permission.' });
         }
         const amount = interaction.options.getInteger('amount');
-        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.', flags: 64 });
+        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.' });
         
-        await interaction.deferReply({ flags: 64 });
+        await interaction.deferReply();
         try {
             const messages = await interaction.channel.messages.fetch({ limit: amount });
             if (messages.size === 0) return interaction.editReply({ content: '❌ No messages.' });
             await interaction.channel.bulkDelete(messages, true);
             await interaction.editReply({ content: `✅ Cleared ${messages.size} messages.` });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
         } catch {
             await interaction.editReply({ content: '❌ Failed. Messages may be too old.' });
         }
@@ -763,7 +760,7 @@ client.on('interactionCreate', async (interaction) => {
     // /review command
     if (interaction.commandName === 'review') {
         if (!interaction.member.roles.cache.has(CONFIG.REVIEW_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            return interaction.reply({ content: '❌ No permission.' });
         }
         const stars = interaction.options.getInteger('stars');
         const product = interaction.options.getString('product');
@@ -784,16 +781,15 @@ client.on('interactionCreate', async (interaction) => {
             .setTimestamp();
         
         const reviewChannel = interaction.guild.channels.cache.get(CONFIG.REVIEW_CHANNEL_ID);
-        if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!', flags: 64 });
+        if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!' });
         await reviewChannel.send({ embeds: [embed] });
-        await interaction.reply({ content: `✅ Review posted!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+        await interaction.reply({ content: `✅ Review posted!` });
     }
     
     // /createpurchase command
     if (interaction.commandName === 'createpurchase') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to create purchases.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to create purchases.' });
         }
         
         const name = interaction.options.getString('name');
@@ -813,25 +809,24 @@ client.on('interactionCreate', async (interaction) => {
         }
         
         if (!finalContent || finalContent.trim() === '') {
-            return interaction.reply({ content: '❌ Please provide either text content or a file.', flags: 64 });
+            return interaction.reply({ content: '❌ Please provide either text content or a file.' });
         }
         
         await addPurchaseToDB(name.toLowerCase(), name, finalContent, interaction.user.tag, Date.now(), !!attachmentUrl, attachmentUrl, attachmentName);
-        await interaction.reply({ content: `✅ Purchase option **${name}** has been created!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+        await interaction.reply({ content: `✅ Purchase option **${name}** has been created!` });
     }
     
     // /purchase command
     if (interaction.commandName === 'purchase') {
         if (!interaction.member.roles.cache.has(CONFIG.PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to purchase products.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to purchase products.' });
         }
         
         const buyer = interaction.options.getUser('user');
         const purchases = await getAllPurchasesFromDB();
         
         if (purchases.size === 0) {
-            return interaction.reply({ content: '❌ No products available!', flags: 64 });
+            return interaction.reply({ content: '❌ No products available!' });
         }
         
         const selectMenu = new StringSelectMenuBuilder()
@@ -849,15 +844,14 @@ client.on('interactionCreate', async (interaction) => {
         
         await interaction.reply({
             content: `📦 **Select a product to purchase for ${buyer}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)],
-            flags: 64
+            components: [new ActionRowBuilder().addComponents(selectMenu)]
         });
     }
     
     // /verifyall command
     if (interaction.commandName === 'verifyall') {
         if (!interaction.member.roles.cache.has(CONFIG.VERIFYALL_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use /verifyall.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to use /verifyall.' });
         }
         await verifyAllMembers(interaction);
     }
@@ -865,7 +859,7 @@ client.on('interactionCreate', async (interaction) => {
     // /addaccount command
     if (interaction.commandName === 'addaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to add accounts.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to add accounts.' });
         }
         
         const type = interaction.options.getString('type');
@@ -882,22 +876,21 @@ client.on('interactionCreate', async (interaction) => {
             .setFooter({ text: `Added by ${interaction.user.tag}` })
             .setTimestamp();
         
-        await interaction.reply({ embeds: [embed], flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+        await interaction.reply({ embeds: [embed] });
         await updateAllStorageDisplays();
     }
     
     // /giveaccount command
     if (interaction.commandName === 'giveaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give accounts.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to give accounts.' });
         }
         
         const user = interaction.options.getUser('user');
         const stats = await getStorageStats();
         
         if (stats.total === 0) {
-            return interaction.reply({ content: '❌ No accounts available!', flags: 64 });
+            return interaction.reply({ content: '❌ No accounts available!' });
         }
         
         const categoryOptions = [];
@@ -912,26 +905,25 @@ client.on('interactionCreate', async (interaction) => {
         
         await interaction.reply({
             content: `📦 **Select a category to give an account to ${user}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)],
-            flags: 64
+            components: [new ActionRowBuilder().addComponents(selectMenu)]
         });
     }
     
     // /givebundle command
     if (interaction.commandName === 'givebundle') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give bundles.', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to give bundles.' });
         }
         
         const user = interaction.options.getUser('user');
         const bundleAvailable = await isBundleAvailable();
         
         if (!bundleAvailable) {
-            return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.', flags: 64 });
+            return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.' });
         }
         
         const bundle = await giveBundle();
-        if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.', flags: 64 });
+        if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.' });
         
         const bundleEmbed = new EmbedBuilder()
             .setTitle(`🎁 **Bundle Given to ${user.tag}**`)
@@ -961,8 +953,7 @@ client.on('interactionCreate', async (interaction) => {
             await user.send({ embeds: [dmEmbed] });
         } catch (error) {}
         
-        await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+        await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!` });
         await updateAllStorageDisplays();
     }
 });
@@ -981,10 +972,10 @@ client.on('interactionCreate', async (interaction) => {
     
     const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
+    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!' });
     
     const maxAmount = await getAccountCount(category);
-    if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!`, flags: 64 });
+    if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!` });
     
     const modal = new ModalBuilder()
         .setCustomId(`giveaccount_amount_${userId}_${channelId}_${category}`)
@@ -1005,7 +996,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER
+// GIVEACCOUNT AMOUNT MODAL HANDLER (BERICHT BLIJFT STAAN)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1021,11 +1012,11 @@ client.on('interactionCreate', async (interaction) => {
     
     const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
-    if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})`, flags: 64 });
+    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!' });
+    if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})` });
     
     const removedAccounts = await removeRandomAccounts(category, amount);
-    if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', flags: 64 });
+    if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.' });
     
     const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
     const accountsText = removedAccounts.map((a, i) => `**${i + 1}.** ${a.content}`).join('\n\n');
@@ -1060,8 +1051,8 @@ client.on('interactionCreate', async (interaction) => {
         await targetUser.send({ embeds: [dmEmbed] });
     } catch (error) {}
     
-    await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, flags: 64 });
-    setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+    // Bericht blijft staan (geen flags:64 en geen setTimeout)
+    await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!` });
     await updateAllStorageDisplays();
 });
 
@@ -1078,12 +1069,12 @@ client.on('interactionCreate', async (interaction) => {
     
     const buyer = await interaction.guild.members.fetch(buyerId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!', flags: 64 });
+    if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!' });
     
     const productName = interaction.values[0];
     const purchases = await getAllPurchasesFromDB();
     const purchase = purchases.get(productName);
-    if (!purchase) return interaction.reply({ content: '❌ Product not found!', flags: 64 });
+    if (!purchase) return interaction.reply({ content: '❌ Product not found!' });
     
     const productEmbed = new EmbedBuilder()
         .setTitle(`🛍️ **${purchase.originalName}**`)
@@ -1099,8 +1090,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTimestamp();
     
     await targetChannel.send({ embeds: [productEmbed] });
-    await interaction.reply({ content: `✅ **${purchase.originalName}** sent!`, flags: 64 });
-    setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
+    await interaction.reply({ content: `✅ **${purchase.originalName}** sent!` });
 });
 
 // ============================================
@@ -1112,8 +1102,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
         await updateStorageDisplayForType(type);
-        await interaction.reply({ content: `🔄 ${type} storage refreshed!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
+        await interaction.reply({ content: `🔄 ${type} storage refreshed!` });
         return;
     }
     
@@ -1127,10 +1116,8 @@ client.on('interactionCreate', async (interaction) => {
         const buffer = Buffer.from(exportText, 'utf-8');
         await interaction.reply({
             content: `📋 ${type} accounts export complete!`,
-            files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }],
-            flags: 64
+            files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }]
         });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 30000);
         return;
     }
     
@@ -1145,16 +1132,16 @@ client.on('interactionCreate', async (interaction) => {
     
     if (roleMap[interaction.customId]) {
         const role = interaction.guild.roles.cache.get(roleMap[interaction.customId]);
-        if (!role) return interaction.reply({ content: '❌ Role not configured!', flags: 64 });
+        if (!role) return interaction.reply({ content: '❌ Role not configured!' });
         
         if (interaction.member.roles.cache.has(role.id)) {
             await interaction.member.roles.remove(role);
-            await interaction.reply({ content: `✅ Removed **${role.name}**`, flags: 64 });
+            await interaction.reply({ content: `✅ Removed **${role.name}**` });
         } else {
             await interaction.member.roles.add(role);
-            await interaction.reply({ content: `✅ Added **${role.name}**`, flags: 64 });
+            await interaction.reply({ content: `✅ Added **${role.name}**` });
         }
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        return;
     }
     
     if (interaction.customId === 'claim_all') {
@@ -1167,8 +1154,8 @@ client.on('interactionCreate', async (interaction) => {
                 added++;
             }
         }
-        await interaction.reply({ content: `✅ Added ${added} role(s)!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        await interaction.reply({ content: `✅ Added ${added} role(s)!` });
+        return;
     }
     
     if (interaction.customId === 'unclaim_all') {
@@ -1181,8 +1168,8 @@ client.on('interactionCreate', async (interaction) => {
                 removed++;
             }
         }
-        await interaction.reply({ content: `✅ Removed ${removed} role(s)!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+        await interaction.reply({ content: `✅ Removed ${removed} role(s)!` });
+        return;
     }
     
     if (interaction.customId.startsWith('buy_')) {
@@ -1197,13 +1184,13 @@ client.on('interactionCreate', async (interaction) => {
                 break;
             }
         }
-        if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!`, flags: 64 });
+        if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!` });
         
-        await interaction.reply({ content: `🛒 Creating ticket for ${name}...`, flags: 64 });
+        await interaction.reply({ content: `🛒 Creating ticket for ${name}...` });
         const channel = await createPurchaseTicket(interaction.user, interaction, name, price);
         await interaction.editReply({ content: `✅ Ticket created: ${channel}` });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
         client.products?.delete(interaction.customId);
+        return;
     }
     
     if (interaction.customId === 'more_info') {
@@ -1213,15 +1200,15 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0x0099ff)
             .setThumbnail(LOGO_URL)
             .setTimestamp();
-        await interaction.reply({ embeds: [embed], flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 10000);
+        await interaction.reply({ embeds: [embed] });
+        return;
     }
     
     if (interaction.customId === 'verify_button') {
         const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
         const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
-        if (!verified) return interaction.reply({ content: '❌ Role not set!', flags: 64 });
-        if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!', flags: 64 });
+        if (!verified) return interaction.reply({ content: '❌ Role not set!' });
+        if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!' });
         
         await interaction.member.roles.add(verified);
         if (unverified) await interaction.member.roles.remove(unverified);
@@ -1232,7 +1219,8 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .setTimestamp();
-        await interaction.reply({ embeds: [embed], flags: 64 });
+        await interaction.reply({ embeds: [embed] });
+        return;
     }
     
     if (interaction.customId === 'create_ticket_menu') {
@@ -1254,7 +1242,7 @@ client.on('interactionCreate', async (interaction) => {
             new ButtonBuilder().setCustomId('purchase_ticket').setLabel('Purchase').setStyle(ButtonStyle.Success).setEmoji('💰'),
             new ButtonBuilder().setCustomId('buysupport_ticket').setLabel('Buy Support').setStyle(ButtonStyle.Danger).setEmoji('🛡️')
         );
-        await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
+        await interaction.reply({ embeds: [embed], components: [row] });
         return;
     }
     
@@ -1265,43 +1253,47 @@ client.on('interactionCreate', async (interaction) => {
     
     if (catId && type) {
         for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!`, flags: 64 });
+            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!` });
         }
-        await interaction.reply({ content: `🎫 Creating ${type} ticket...`, flags: 64 });
+        await interaction.reply({ content: `🎫 Creating ${type} ticket...` });
         const channel = await createTicket(interaction.user, interaction, catId, type);
         await interaction.editReply({ content: `✅ Ticket created: ${channel}` });
+        return;
     }
     
     const ticket = tickets.get(interaction.channelId);
     if (!ticket) return;
     
     if (interaction.customId === 'claim_ticket') {
-        if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) return interaction.reply({ content: '❌ No permission!', flags: 64 });
-        if (ticket.claimedBy) return interaction.reply({ content: '❌ Already claimed!', flags: 64 });
+        if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) return interaction.reply({ content: '❌ No permission!' });
+        if (ticket.claimedBy) return interaction.reply({ content: '❌ Already claimed!' });
         ticket.claimedBy = interaction.user.id;
         tickets.set(interaction.channelId, ticket);
         await interaction.reply({ content: `🎯 ${interaction.user.tag} claimed this ticket!` });
         const user = await interaction.guild.members.fetch(ticket.userId).catch(() => null);
         if (user) user.send(`✅ Your ticket was claimed by ${interaction.user.tag}!`).catch(() => {});
+        return;
     }
     
     if (interaction.customId === 'close_ticket') {
         const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticket.userId === interaction.user.id;
-        if (!hasPerm) return interaction.reply({ content: '❌ No permission!', flags: 64 });
+        if (!hasPerm) return interaction.reply({ content: '❌ No permission!' });
         await interaction.reply({ content: '🔒 Closing in 5 seconds...' });
         setTimeout(async () => {
             await sendTranscript(interaction.channel, interaction);
             await interaction.channel.delete();
             tickets.delete(interaction.channelId);
         }, 5000);
+        return;
     }
     
     if (interaction.customId === 'transcript') {
         const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticket.userId === interaction.user.id;
-        if (!hasPerm) return interaction.reply({ content: '❌ No permission!', flags: 64 });
-        await interaction.reply({ content: '📄 Generating...', flags: 64 });
+        if (!hasPerm) return interaction.reply({ content: '❌ No permission!' });
+        await interaction.reply({ content: '📄 Generating...' });
         await sendTranscript(interaction.channel, interaction);
         await interaction.editReply({ content: '✅ Transcript sent!' });
+        return;
     }
 });
 
@@ -1313,11 +1305,10 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId !== 'send_message_modal') return;
     
     const messageContent = interaction.fields.getTextInputValue('message_content');
-    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.', flags: 64 });
+    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.' });
     
     await interaction.channel.send(messageContent);
-    await interaction.reply({ content: '✅ Message sent!', flags: 64 });
-    setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
+    await interaction.reply({ content: '✅ Message sent!' });
 });
 
 // ============================================
