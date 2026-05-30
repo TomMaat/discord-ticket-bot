@@ -12,7 +12,6 @@ const pool = new Pool({
 
 async function initDatabase() {
     try {
-        // Storage tabel
         await pool.query(`
             CREATE TABLE IF NOT EXISTS storage (
                 id SERIAL PRIMARY KEY,
@@ -23,8 +22,6 @@ async function initDatabase() {
                 added_at BIGINT NOT NULL
             )
         `);
-        
-        // Purchases tabel
         await pool.query(`
             CREATE TABLE IF NOT EXISTS purchases (
                 id SERIAL PRIMARY KEY,
@@ -38,8 +35,6 @@ async function initDatabase() {
                 file_name TEXT
             )
         `);
-        
-        // TICKETS TABEL - NIEUW! Voor permanente ticket opslag
         await pool.query(`
             CREATE TABLE IF NOT EXISTS tickets_db (
                 id SERIAL PRIMARY KEY,
@@ -52,7 +47,6 @@ async function initDatabase() {
                 is_open BOOLEAN DEFAULT TRUE
             )
         `);
-        
         console.log('✅ Database tabellen zijn klaar!');
     } catch (error) {
         console.log('❌ Database error:', error.message);
@@ -175,7 +169,6 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(3000, () => console.log('Keep-alive server running on port 3000'));
 
-// Gebruik Map voor snelle toegang, maar database is de source of truth
 let tickets = new Map();
 const joinedMembers = new Set();
 const LOGO_URL = 'https://cdn.discordapp.com/attachments/1509665549410635787/1509928894361370735/hexmods.png';
@@ -509,7 +502,7 @@ async function sendVerificationMessage(guild) {
 }
 
 // ============================================
-// TICKET CREATION - MET DATABASE OPSLAG
+// TICKET CREATION
 // ============================================
 async function createTicket(user, interaction, categoryId, type) {
     const guild = interaction.guild;
@@ -527,11 +520,9 @@ async function createTicket(user, interaction, categoryId, type) {
         ]
     });
     
-    // Opslaan in database
     const createdAt = Date.now();
     await saveTicketToDB(channel.id, user.id, type, createdAt);
     
-    // Ook in Map voor snelle toegang
     tickets.set(channel.id, { 
         userId: user.id, 
         claimedBy: null, 
@@ -579,11 +570,9 @@ async function createPurchaseTicket(user, interaction, productName, price) {
         ]
     });
     
-    // Opslaan in database
     const createdAt = Date.now();
     await saveTicketToDB(channel.id, user.id, 'Purchase', createdAt);
     
-    // Ook in Map voor snelle toegang
     tickets.set(channel.id, { 
         userId: user.id, 
         claimedBy: null, 
@@ -768,7 +757,6 @@ client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
     await initDatabase();
     
-    // Laad alle open tickets uit database
     tickets = await loadAllOpenTickets();
     
     const guild = client.guilds.cache.first();
@@ -801,7 +789,7 @@ client.on('interactionCreate', async (interaction) => {
     // /send command
     if (interaction.commandName === 'send') {
         if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use `/send`.' });
+            return interaction.reply({ content: '❌ You do not have permission to use `/send`.', ephemeral: true });
         }
         const modal = new ModalBuilder()
             .setCustomId('send_message_modal')
@@ -823,7 +811,7 @@ client.on('interactionCreate', async (interaction) => {
     // /product command
     if (interaction.commandName === 'product') {
         if (!interaction.member.roles.cache.has(CONFIG.PRODUCT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.' });
+            return interaction.reply({ content: '❌ No permission.', ephemeral: true });
         }
         const name = interaction.options.getString('name');
         const inStock = interaction.options.getString('instock') === 'yes';
@@ -854,18 +842,18 @@ client.on('interactionCreate', async (interaction) => {
         client.products.set(btnId, { name, price });
         
         await interaction.channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: '✅ Product posted!' });
+        await interaction.reply({ content: '✅ Product posted!', ephemeral: true });
     }
     
     // /clear command
     if (interaction.commandName === 'clear') {
         if (!interaction.member.roles.cache.has(CONFIG.CLEAR_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.' });
+            return interaction.reply({ content: '❌ No permission.', ephemeral: true });
         }
         const amount = interaction.options.getInteger('amount');
-        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.' });
+        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.', ephemeral: true });
         
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
         try {
             const messages = await interaction.channel.messages.fetch({ limit: amount });
             if (messages.size === 0) return interaction.editReply({ content: '❌ No messages.' });
@@ -879,7 +867,7 @@ client.on('interactionCreate', async (interaction) => {
     // /review command
     if (interaction.commandName === 'review') {
         if (!interaction.member.roles.cache.has(CONFIG.REVIEW_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.' });
+            return interaction.reply({ content: '❌ No permission.', ephemeral: true });
         }
         const stars = interaction.options.getInteger('stars');
         const product = interaction.options.getString('product');
@@ -900,15 +888,15 @@ client.on('interactionCreate', async (interaction) => {
             .setTimestamp();
         
         const reviewChannel = interaction.guild.channels.cache.get(CONFIG.REVIEW_CHANNEL_ID);
-        if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!' });
+        if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!', ephemeral: true });
         await reviewChannel.send({ embeds: [embed] });
-        await interaction.reply({ content: `✅ Review posted!` });
+        await interaction.reply({ content: `✅ Review posted!`, ephemeral: true });
     }
     
     // /createpurchase command
     if (interaction.commandName === 'createpurchase') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to create purchases.' });
+            return interaction.reply({ content: '❌ You do not have permission to create purchases.', ephemeral: true });
         }
         
         const name = interaction.options.getString('name');
@@ -928,24 +916,24 @@ client.on('interactionCreate', async (interaction) => {
         }
         
         if (!finalContent || finalContent.trim() === '') {
-            return interaction.reply({ content: '❌ Please provide either text content or a file.' });
+            return interaction.reply({ content: '❌ Please provide either text content or a file.', ephemeral: true });
         }
         
         await addPurchaseToDB(name.toLowerCase(), name, finalContent, interaction.user.tag, Date.now(), !!attachmentUrl, attachmentUrl, attachmentName);
-        await interaction.reply({ content: `✅ Purchase option **${name}** has been created!` });
+        await interaction.reply({ content: `✅ Purchase option **${name}** has been created!`, ephemeral: true });
     }
     
     // /purchase command
     if (interaction.commandName === 'purchase') {
         if (!interaction.member.roles.cache.has(CONFIG.PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to purchase products.' });
+            return interaction.reply({ content: '❌ You do not have permission to purchase products.', ephemeral: true });
         }
         
         const buyer = interaction.options.getUser('user');
         const purchases = await getAllPurchasesFromDB();
         
         if (purchases.size === 0) {
-            return interaction.reply({ content: '❌ No products available!' });
+            return interaction.reply({ content: '❌ No products available!', ephemeral: true });
         }
         
         const selectMenu = new StringSelectMenuBuilder()
@@ -963,14 +951,15 @@ client.on('interactionCreate', async (interaction) => {
         
         await interaction.reply({
             content: `📦 **Select a product to purchase for ${buyer}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)]
+            components: [new ActionRowBuilder().addComponents(selectMenu)],
+            ephemeral: true
         });
     }
     
     // /verifyall command
     if (interaction.commandName === 'verifyall') {
         if (!interaction.member.roles.cache.has(CONFIG.VERIFYALL_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use /verifyall.' });
+            return interaction.reply({ content: '❌ You do not have permission to use /verifyall.', ephemeral: true });
         }
         await verifyAllMembers(interaction);
     }
@@ -978,7 +967,7 @@ client.on('interactionCreate', async (interaction) => {
     // /addaccount command
     if (interaction.commandName === 'addaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to add accounts.' });
+            return interaction.reply({ content: '❌ You do not have permission to add accounts.', ephemeral: true });
         }
         
         const type = interaction.options.getString('type');
@@ -995,21 +984,21 @@ client.on('interactionCreate', async (interaction) => {
             .setFooter({ text: `Added by ${interaction.user.tag}` })
             .setTimestamp();
         
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         await updateAllStorageDisplays();
     }
     
     // /giveaccount command
     if (interaction.commandName === 'giveaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give accounts.' });
+            return interaction.reply({ content: '❌ You do not have permission to give accounts.', ephemeral: true });
         }
         
         const user = interaction.options.getUser('user');
         const stats = await getStorageStats();
         
         if (stats.total === 0) {
-            return interaction.reply({ content: '❌ No accounts available!' });
+            return interaction.reply({ content: '❌ No accounts available!', ephemeral: true });
         }
         
         const categoryOptions = [];
@@ -1024,25 +1013,26 @@ client.on('interactionCreate', async (interaction) => {
         
         await interaction.reply({
             content: `📦 **Select a category to give an account to ${user}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)]
+            components: [new ActionRowBuilder().addComponents(selectMenu)],
+            ephemeral: true
         });
     }
     
     // /givebundle command
     if (interaction.commandName === 'givebundle') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give bundles.' });
+            return interaction.reply({ content: '❌ You do not have permission to give bundles.', ephemeral: true });
         }
         
         const user = interaction.options.getUser('user');
         const bundleAvailable = await isBundleAvailable();
         
         if (!bundleAvailable) {
-            return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.' });
+            return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.', ephemeral: true });
         }
         
         const bundle = await giveBundle();
-        if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.' });
+        if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.', ephemeral: true });
         
         const bundleEmbed = new EmbedBuilder()
             .setTitle(`🎁 **Bundle Given to ${user.tag}**`)
@@ -1072,7 +1062,7 @@ client.on('interactionCreate', async (interaction) => {
             await user.send({ embeds: [dmEmbed] });
         } catch (error) {}
         
-        await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!` });
+        await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, ephemeral: true });
         await updateAllStorageDisplays();
     }
 });
@@ -1085,10 +1075,10 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId !== 'send_message_modal') return;
     
     const messageContent = interaction.fields.getTextInputValue('message_content');
-    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.' });
+    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.', ephemeral: true });
     
     await interaction.channel.send(messageContent);
-    await interaction.reply({ content: '✅ Message sent!' });
+    await interaction.reply({ content: '✅ Message sent!', ephemeral: true });
 });
 
 // ============================================
@@ -1105,10 +1095,10 @@ client.on('interactionCreate', async (interaction) => {
     
     const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!' });
+    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', ephemeral: true });
     
     const maxAmount = await getAccountCount(category);
-    if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!` });
+    if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!`, ephemeral: true });
     
     const modal = new ModalBuilder()
         .setCustomId(`giveaccount_amount_${userId}_${channelId}_${category}`)
@@ -1145,11 +1135,11 @@ client.on('interactionCreate', async (interaction) => {
     
     const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!' });
-    if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})` });
+    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', ephemeral: true });
+    if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})`, ephemeral: true });
     
     const removedAccounts = await removeRandomAccounts(category, amount);
-    if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.' });
+    if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', ephemeral: true });
     
     const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
     const accountsText = removedAccounts.map((a, i) => `**${i + 1}.** ${a.content}`).join('\n\n');
@@ -1184,7 +1174,7 @@ client.on('interactionCreate', async (interaction) => {
         await targetUser.send({ embeds: [dmEmbed] });
     } catch (error) {}
     
-    await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!` });
+    await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, ephemeral: true });
     await updateAllStorageDisplays();
 });
 
@@ -1201,12 +1191,12 @@ client.on('interactionCreate', async (interaction) => {
     
     const buyer = await interaction.guild.members.fetch(buyerId).catch(() => null);
     const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!' });
+    if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!', ephemeral: true });
     
     const productName = interaction.values[0];
     const purchases = await getAllPurchasesFromDB();
     const purchase = purchases.get(productName);
-    if (!purchase) return interaction.reply({ content: '❌ Product not found!' });
+    if (!purchase) return interaction.reply({ content: '❌ Product not found!', ephemeral: true });
     
     const productEmbed = new EmbedBuilder()
         .setTitle(`🛍️ **${purchase.originalName}**`)
@@ -1222,11 +1212,11 @@ client.on('interactionCreate', async (interaction) => {
         .setTimestamp();
     
     await targetChannel.send({ embeds: [productEmbed] });
-    await interaction.reply({ content: `✅ **${purchase.originalName}** sent!` });
+    await interaction.reply({ content: `✅ **${purchase.originalName}** sent!`, ephemeral: true });
 });
 
 // ============================================
-// BUTTON HANDLERS (Inclusief Ticket Close Fix)
+// BUTTON HANDLERS
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
@@ -1235,7 +1225,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
         await updateStorageDisplayForType(type);
-        await interaction.reply({ content: `🔄 ${type} storage refreshed!` });
+        await interaction.reply({ content: `🔄 ${type} storage refreshed!`, ephemeral: true });
         return;
     }
     
@@ -1250,7 +1240,8 @@ client.on('interactionCreate', async (interaction) => {
         const buffer = Buffer.from(exportText, 'utf-8');
         await interaction.reply({
             content: `📋 ${type} accounts export complete!`,
-            files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }]
+            files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }],
+            ephemeral: true
         });
         return;
     }
@@ -1266,14 +1257,14 @@ client.on('interactionCreate', async (interaction) => {
     
     if (roleMap[interaction.customId]) {
         const role = interaction.guild.roles.cache.get(roleMap[interaction.customId]);
-        if (!role) return interaction.reply({ content: '❌ Role not configured!' });
+        if (!role) return interaction.reply({ content: '❌ Role not configured!', ephemeral: true });
         
         if (interaction.member.roles.cache.has(role.id)) {
             await interaction.member.roles.remove(role);
-            await interaction.reply({ content: `✅ Removed **${role.name}**` });
+            await interaction.reply({ content: `✅ Removed **${role.name}**`, ephemeral: true });
         } else {
             await interaction.member.roles.add(role);
-            await interaction.reply({ content: `✅ Added **${role.name}**` });
+            await interaction.reply({ content: `✅ Added **${role.name}**`, ephemeral: true });
         }
         return;
     }
@@ -1288,7 +1279,7 @@ client.on('interactionCreate', async (interaction) => {
                 added++;
             }
         }
-        await interaction.reply({ content: `✅ Added ${added} role(s)!` });
+        await interaction.reply({ content: `✅ Added ${added} role(s)!`, ephemeral: true });
         return;
     }
     
@@ -1302,7 +1293,7 @@ client.on('interactionCreate', async (interaction) => {
                 removed++;
             }
         }
-        await interaction.reply({ content: `✅ Removed ${removed} role(s)!` });
+        await interaction.reply({ content: `✅ Removed ${removed} role(s)!`, ephemeral: true });
         return;
     }
     
@@ -1319,11 +1310,11 @@ client.on('interactionCreate', async (interaction) => {
                 break;
             }
         }
-        if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!` });
+        if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!`, ephemeral: true });
         
-        await interaction.reply({ content: `🛒 Creating ticket for ${name}...` });
+        await interaction.reply({ content: `🛒 Creating ticket for ${name}...`, ephemeral: true });
         const channel = await createPurchaseTicket(interaction.user, interaction, name, price);
-        await interaction.editReply({ content: `✅ Ticket created: ${channel}` });
+        await interaction.editReply({ content: `✅ Ticket created: ${channel}`, ephemeral: true });
         client.products?.delete(interaction.customId);
         return;
     }
@@ -1335,26 +1326,44 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0x0099ff)
             .setThumbnail(LOGO_URL)
             .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
     
+    // ============================================
+    // VERIFICATION BUTTON - ALLEEN ZICHTBAAR VOOR DE GEBRUIKER
+    // ============================================
     if (interaction.customId === 'verify_button') {
         const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
         const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
-        if (!verified) return interaction.reply({ content: '❌ Role not set!' });
-        if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!' });
+        if (!verified) return interaction.reply({ content: '❌ Role not set!', ephemeral: true });
+        if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!', ephemeral: true });
         
         await interaction.member.roles.add(verified);
         if (unverified) await interaction.member.roles.remove(unverified);
         
         const embed = new EmbedBuilder()
             .setTitle('✅ **Verification Successful!**')
-            .setDescription(`Welcome ${interaction.user}! You now have access.`)
+            .setDescription(`Welcome ${interaction.user}! You now have access to all channels.`)
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .setTimestamp();
-        await interaction.reply({ embeds: [embed] });
+        
+        // Alleen de gebruiker ziet dit bericht (ephemeral)
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        
+        // Log naar log channel (alleen voor admins)
+        const logChannel = interaction.guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
+        if (logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setTitle('✅ User Verified')
+                .setDescription(`**User:** ${interaction.user.tag} (${interaction.user.id})\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+                .setColor(0x00ff00)
+                .setTimestamp();
+            await logChannel.send({ embeds: [logEmbed] });
+        }
+        
+        console.log(`✅ Verified ${interaction.user.tag}`);
         return;
     }
     
@@ -1377,7 +1386,7 @@ client.on('interactionCreate', async (interaction) => {
             new ButtonBuilder().setCustomId('purchase_ticket').setLabel('Purchase').setStyle(ButtonStyle.Success).setEmoji('💰'),
             new ButtonBuilder().setCustomId('buysupport_ticket').setLabel('Buy Support').setStyle(ButtonStyle.Danger).setEmoji('🛡️')
         );
-        await interaction.reply({ embeds: [embed], components: [row] });
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
         return;
     }
     
@@ -1389,28 +1398,24 @@ client.on('interactionCreate', async (interaction) => {
     
     if (catId && type) {
         for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!` });
+            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!`, ephemeral: true });
         }
-        await interaction.reply({ content: `🎫 Creating ${type} ticket...` });
+        await interaction.reply({ content: `🎫 Creating ${type} ticket...`, ephemeral: true });
         const channel = await createTicket(interaction.user, interaction, catId, type);
-        await interaction.editReply({ content: `✅ Ticket created: ${channel}` });
+        await interaction.editReply({ content: `✅ Ticket created: ${channel}`, ephemeral: true });
         return;
     }
     
     // ============================================
-    // TICKET MANAGEMENT BUTTONS (Claim, Close, Transcript)
+    // TICKET MANAGEMENT BUTTONS
     // ============================================
-    
-    // Eerst checken in Map, anders in database
     let ticketData = tickets.get(interaction.channelId);
     
     if (!ticketData) {
-        // Probeer uit database te laden
         const dbTicket = await getTicketFromDB(interaction.channelId);
         if (dbTicket) {
             ticketData = dbTicket;
             tickets.set(interaction.channelId, ticketData);
-            console.log(`📋 Ticket data geladen uit database voor ${interaction.channelId}`);
         }
     }
     
@@ -1422,16 +1427,14 @@ client.on('interactionCreate', async (interaction) => {
     // CLAIM TICKET
     if (interaction.customId === 'claim_ticket') {
         if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to claim tickets!' });
+            return interaction.reply({ content: '❌ You do not have permission to claim tickets!', ephemeral: true });
         }
         if (ticketData.claimedBy) {
-            return interaction.reply({ content: '❌ This ticket has already been claimed!' });
+            return interaction.reply({ content: '❌ This ticket has already been claimed!', ephemeral: true });
         }
         
         ticketData.claimedBy = interaction.user.id;
         tickets.set(interaction.channelId, ticketData);
-        
-        // Update in database
         await claimTicketInDB(interaction.channelId, interaction.user.id);
         
         const embed = new EmbedBuilder()
@@ -1457,10 +1460,9 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'close_ticket') {
         const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
         if (!hasPerm) {
-            return interaction.reply({ content: '❌ You do not have permission to close this ticket!' });
+            return interaction.reply({ content: '❌ You do not have permission to close this ticket!', ephemeral: true });
         }
         
-        // Markeer als gesloten in database
         await closeTicketInDB(interaction.channelId);
         
         const closeEmbed = new EmbedBuilder()
@@ -1483,12 +1485,12 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'transcript') {
         const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
         if (!hasPerm) {
-            return interaction.reply({ content: '❌ You do not have permission to get transcript!' });
+            return interaction.reply({ content: '❌ You do not have permission to get transcript!', ephemeral: true });
         }
         
-        await interaction.reply({ content: '📄 Generating transcript...' });
+        await interaction.reply({ content: '📄 Generating transcript...', ephemeral: true });
         await sendTranscript(interaction.channel, interaction);
-        await interaction.editReply({ content: '✅ Transcript has been sent to the transcript channel!' });
+        await interaction.editReply({ content: '✅ Transcript has been sent to the transcript channel!', ephemeral: true });
         return;
     }
 });
