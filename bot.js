@@ -12,6 +12,7 @@ const pool = new Pool({
 
 async function initDatabase() {
     try {
+        // Storage tabel
         await pool.query(`
             CREATE TABLE IF NOT EXISTS storage (
                 id SERIAL PRIMARY KEY,
@@ -22,6 +23,8 @@ async function initDatabase() {
                 added_at BIGINT NOT NULL
             )
         `);
+        
+        // Purchases tabel
         await pool.query(`
             CREATE TABLE IF NOT EXISTS purchases (
                 id SERIAL PRIMARY KEY,
@@ -35,10 +38,82 @@ async function initDatabase() {
                 file_name TEXT
             )
         `);
+        
+        // TICKETS TABEL - NIEUW! Voor permanente ticket opslag
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS tickets_db (
+                id SERIAL PRIMARY KEY,
+                channel_id VARCHAR(20) NOT NULL UNIQUE,
+                user_id VARCHAR(20) NOT NULL,
+                claimed_by VARCHAR(20),
+                ticket_type VARCHAR(50) NOT NULL,
+                created_at BIGINT NOT NULL,
+                closed_at BIGINT,
+                is_open BOOLEAN DEFAULT TRUE
+            )
+        `);
+        
         console.log('✅ Database tabellen zijn klaar!');
     } catch (error) {
         console.log('❌ Database error:', error.message);
     }
+}
+
+// ============================================
+// TICKET DATABASE FUNCTIES
+// ============================================
+async function saveTicketToDB(channelId, userId, ticketType, createdAt) {
+    await pool.query(
+        `INSERT INTO tickets_db (channel_id, user_id, ticket_type, created_at, is_open) 
+         VALUES ($1, $2, $3, $4, TRUE)`,
+        [channelId, userId, ticketType, createdAt]
+    );
+}
+
+async function closeTicketInDB(channelId) {
+    await pool.query(
+        `UPDATE tickets_db SET is_open = FALSE, closed_at = $1 WHERE channel_id = $2`,
+        [Date.now(), channelId]
+    );
+}
+
+async function claimTicketInDB(channelId, claimedBy) {
+    await pool.query(
+        `UPDATE tickets_db SET claimed_by = $1 WHERE channel_id = $2`,
+        [claimedBy, channelId]
+    );
+}
+
+async function getTicketFromDB(channelId) {
+    const result = await pool.query(
+        `SELECT * FROM tickets_db WHERE channel_id = $1 AND is_open = TRUE`,
+        [channelId]
+    );
+    if (result.rows.length > 0) {
+        return {
+            userId: result.rows[0].user_id,
+            claimedBy: result.rows[0].claimed_by,
+            createdAt: result.rows[0].created_at,
+            type: result.rows[0].ticket_type,
+            isOpen: result.rows[0].is_open
+        };
+    }
+    return null;
+}
+
+async function loadAllOpenTickets() {
+    const result = await pool.query(`SELECT * FROM tickets_db WHERE is_open = TRUE`);
+    const ticketsMap = new Map();
+    for (const row of result.rows) {
+        ticketsMap.set(row.channel_id, {
+            userId: row.user_id,
+            claimedBy: row.claimed_by,
+            createdAt: row.created_at,
+            type: row.ticket_type
+        });
+    }
+    console.log(`✅ ${ticketsMap.size} open tickets geladen uit database`);
+    return ticketsMap;
 }
 
 // ============================================
@@ -100,7 +175,8 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(3000, () => console.log('Keep-alive server running on port 3000'));
 
-const tickets = new Map();
+// Gebruik Map voor snelle toegang, maar database is de source of truth
+let tickets = new Map();
 const joinedMembers = new Set();
 const LOGO_URL = 'https://cdn.discordapp.com/attachments/1509665549410635787/1509928894361370735/hexmods.png';
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -387,7 +463,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Open a modal to send a message as the bot (supports @mentions, Shift+Enter for new line)', inline: false },
+            { name: '📝 `/send`', value: 'Open a modal to send a message as the bot (supports @mentions)', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -433,7 +509,7 @@ async function sendVerificationMessage(guild) {
 }
 
 // ============================================
-// TICKET CREATION
+// TICKET CREATION - MET DATABASE OPSLAG
 // ============================================
 async function createTicket(user, interaction, categoryId, type) {
     const guild = interaction.guild;
@@ -451,18 +527,28 @@ async function createTicket(user, interaction, categoryId, type) {
         ]
     });
     
-    tickets.set(channel.id, { userId: user.id, claimedBy: null, createdAt: Date.now(), type: type });
+    // Opslaan in database
+    const createdAt = Date.now();
+    await saveTicketToDB(channel.id, user.id, type, createdAt);
+    
+    // Ook in Map voor snelle toegang
+    tickets.set(channel.id, { 
+        userId: user.id, 
+        claimedBy: null, 
+        createdAt: createdAt, 
+        type: type 
+    });
     
     const embed = new EmbedBuilder()
         .setTitle(`🎫 ${type} Ticket`)
-        .setDescription(`Welcome ${user}! Your ticket has been created.\n\n**Type:** ${type}\n**Created:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+        .setDescription(`Welcome ${user}! Your ticket has been created.\n\n**Type:** ${type}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
         .setColor(0x00ff00)
         .setThumbnail(LOGO_URL)
         .addFields(
             { name: '📌 Instructions', value: '• **Claim Ticket** - Take ownership\n• **Close Ticket** - Delete ticket\n• **Get Transcript** - Save chat log', inline: false },
             { name: '👤 User', value: user.toString(), inline: true }
         )
-        .setFooter({ text: `Ticket System` })
+        .setFooter({ text: `Ticket System`, iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
     
     const row = new ActionRowBuilder().addComponents(
@@ -472,6 +558,9 @@ async function createTicket(user, interaction, categoryId, type) {
     );
     
     await channel.send({ content: `${user} ${supportRole}`, embeds: [embed], components: [row] });
+    
+    console.log(`✅ Ticket created: ${channel.id} for user ${user.id} (Type: ${type})`);
+    
     return channel;
 }
 
@@ -490,11 +579,21 @@ async function createPurchaseTicket(user, interaction, productName, price) {
         ]
     });
     
-    tickets.set(channel.id, { userId: user.id, claimedBy: null, createdAt: Date.now(), type: 'Purchase' });
+    // Opslaan in database
+    const createdAt = Date.now();
+    await saveTicketToDB(channel.id, user.id, 'Purchase', createdAt);
+    
+    // Ook in Map voor snelle toegang
+    tickets.set(channel.id, { 
+        userId: user.id, 
+        claimedBy: null, 
+        createdAt: createdAt, 
+        type: 'Purchase' 
+    });
     
     const embed = new EmbedBuilder()
         .setTitle(`🛒 Purchase Ticket`)
-        .setDescription(`Welcome ${user}! Your purchase ticket has been created.\n\n**Product:** ${productName}\n**Price:** ${price}\n**Created:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+        .setDescription(`Welcome ${user}! Your purchase ticket has been created.\n\n**Product:** ${productName}\n**Price:** ${price}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
         .setColor(0x00ff00)
         .setThumbnail(LOGO_URL)
         .addFields(
@@ -503,7 +602,7 @@ async function createPurchaseTicket(user, interaction, productName, price) {
             { name: '🛒 Product', value: productName, inline: true },
             { name: '💰 Price', value: price, inline: true }
         )
-        .setFooter({ text: `Purchase System` })
+        .setFooter({ text: `Ticket System`, iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
     
     const row = new ActionRowBuilder().addComponents(
@@ -513,26 +612,43 @@ async function createPurchaseTicket(user, interaction, productName, price) {
     );
     
     await channel.send({ content: `${user} ${supportRole}`, embeds: [embed], components: [row] });
+    
+    console.log(`✅ Purchase ticket created: ${channel.id} for user ${user.id}`);
+    
     return channel;
 }
 
 async function sendTranscript(channel, interaction) {
     const messages = await channel.messages.fetch({ limit: 100 });
     const data = tickets.get(channel.id);
-    let transcript = `Ticket Transcript: ${channel.name}\nType: ${data?.type || 'Unknown'}\nCreated: ${new Date(data?.createdAt || Date.now()).toLocaleString()}\nClosed: ${new Date().toLocaleString()}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    messages.reverse().forEach(msg => { transcript += `[${msg.author.tag}] (${msg.createdAt.toLocaleString()}): ${msg.content || '(embed)'}\n`; });
+    
+    if (!data) {
+        console.log(`⚠️ No ticket data found for channel ${channel.id}`);
+        return;
+    }
+    
+    let transcript = `Ticket Transcript: ${channel.name}\n`;
+    transcript += `Type: ${data?.type || 'Unknown'}\n`;
+    transcript += `Created: ${new Date(data?.createdAt || Date.now()).toLocaleString()}\n`;
+    transcript += `Closed: ${new Date().toLocaleString()}\n`;
+    transcript += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    messages.reverse().forEach(msg => {
+        transcript += `[${msg.author.tag}] (${msg.createdAt.toLocaleString()}): ${msg.content || '(embed/attachment)'}\n`;
+    });
     
     const transcriptChannel = interaction.guild.channels.cache.get(CONFIG.TRANSCRIPT_CHANNEL_ID);
     if (transcriptChannel) {
         const embed = new EmbedBuilder()
             .setTitle('📝 Ticket Transcript')
-            .setDescription(`Transcript for ${channel.name}`)
+            .setDescription(`Transcript for ${channel.name}\n**Type:** ${data?.type || 'Unknown'}`)
             .setColor(0x00aaff)
             .addFields(
                 { name: 'User', value: `<@${data.userId}>`, inline: true },
                 { name: 'Created', value: `<t:${Math.floor(data.createdAt / 1000)}:F>`, inline: true }
             )
             .setTimestamp();
+        
         await transcriptChannel.send({ embeds: [embed], files: [{ attachment: Buffer.from(transcript, 'utf-8'), name: `${channel.name}-transcript.txt` }] });
     }
 }
@@ -652,6 +768,9 @@ client.once('ready', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
     await initDatabase();
     
+    // Laad alle open tickets uit database
+    tickets = await loadAllOpenTickets();
+    
     const guild = client.guilds.cache.first();
     if (guild) {
         await updateMemberCount(guild);
@@ -669,8 +788,8 @@ client.once('ready', async () => {
         }, 300000);
     }
     console.log('✅ Bot is fully ready!');
-    const stats = await getStorageStats();
-    console.log(`📦 Storage: Discord: ${stats.discord}, Steam: ${stats.steam}, FiveM: ${stats.fivem}`);
+    console.log(`📦 Storage: Discord: ${await getAccountCount('discord')}, Steam: ${await getAccountCount('steam')}, FiveM: ${await getAccountCount('fivem')}`);
+    console.log(`🎫 Open tickets: ${tickets.size}`);
 });
 
 // ============================================
@@ -679,7 +798,7 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     
-    // /send command - Opens a modal for multi-line messages (supports @mentions)
+    // /send command
     if (interaction.commandName === 'send') {
         if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
             return interaction.reply({ content: '❌ You do not have permission to use `/send`.' });
@@ -959,7 +1078,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// MODAL HANDLER FOR /send (MET MENTIONS)
+// MODAL HANDLER FOR /send
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -968,7 +1087,6 @@ client.on('interactionCreate', async (interaction) => {
     const messageContent = interaction.fields.getTextInputValue('message_content');
     if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.' });
     
-    // Discord verwerkt @mentions automatisch
     await interaction.channel.send(messageContent);
     await interaction.reply({ content: '✅ Message sent!' });
 });
@@ -1108,11 +1226,12 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// BUTTON HANDLERS
+// BUTTON HANDLERS (Inclusief Ticket Close Fix)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     
+    // Refresh storage buttons
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
         await updateStorageDisplayForType(type);
@@ -1120,6 +1239,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
+    // Export storage buttons
     if (interaction.customId === 'export_discord' || interaction.customId === 'export_steam' || interaction.customId === 'export_fivem') {
         const type = interaction.customId.replace('export_', '');
         const accounts = await getAllAccountsByType(type);
@@ -1186,6 +1306,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
+    // Buy product button
     if (interaction.customId.startsWith('buy_')) {
         const product = client.products?.get(interaction.customId);
         const name = product?.name || 'Unknown';
@@ -1260,6 +1381,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
+    // Ticket category selection
     let catId = null, type = null;
     if (interaction.customId === 'general_ticket') { catId = CONFIG.GENERAL_CATEGORY_ID; type = 'General Question'; }
     else if (interaction.customId === 'purchase_ticket') { catId = CONFIG.PURCHASE_CATEGORY_ID; type = 'Purchase'; }
@@ -1275,24 +1397,80 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    const ticket = tickets.get(interaction.channelId);
-    if (!ticket) return;
+    // ============================================
+    // TICKET MANAGEMENT BUTTONS (Claim, Close, Transcript)
+    // ============================================
     
+    // Eerst checken in Map, anders in database
+    let ticketData = tickets.get(interaction.channelId);
+    
+    if (!ticketData) {
+        // Probeer uit database te laden
+        const dbTicket = await getTicketFromDB(interaction.channelId);
+        if (dbTicket) {
+            ticketData = dbTicket;
+            tickets.set(interaction.channelId, ticketData);
+            console.log(`📋 Ticket data geladen uit database voor ${interaction.channelId}`);
+        }
+    }
+    
+    if (!ticketData) {
+        console.log(`⚠️ Geen ticket data gevonden voor ${interaction.channelId}`);
+        return interaction.reply({ content: '❌ Ticket not found! Please contact an admin.', ephemeral: true });
+    }
+    
+    // CLAIM TICKET
     if (interaction.customId === 'claim_ticket') {
-        if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) return interaction.reply({ content: '❌ No permission!' });
-        if (ticket.claimedBy) return interaction.reply({ content: '❌ Already claimed!' });
-        ticket.claimedBy = interaction.user.id;
-        tickets.set(interaction.channelId, ticket);
-        await interaction.reply({ content: `🎯 ${interaction.user.tag} claimed this ticket!` });
-        const user = await interaction.guild.members.fetch(ticket.userId).catch(() => null);
-        if (user) user.send(`✅ Your ticket was claimed by ${interaction.user.tag}!`).catch(() => {});
+        if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) {
+            return interaction.reply({ content: '❌ You do not have permission to claim tickets!' });
+        }
+        if (ticketData.claimedBy) {
+            return interaction.reply({ content: '❌ This ticket has already been claimed!' });
+        }
+        
+        ticketData.claimedBy = interaction.user.id;
+        tickets.set(interaction.channelId, ticketData);
+        
+        // Update in database
+        await claimTicketInDB(interaction.channelId, interaction.user.id);
+        
+        const embed = new EmbedBuilder()
+            .setTitle('🎯 Ticket Claimed')
+            .setDescription(`${interaction.user.toString()} has claimed this ticket and will assist you.`)
+            .setColor(0xffaa00)
+            .addFields(
+                { name: 'Claimed by', value: interaction.user.tag, inline: true },
+                { name: 'Ticket Type', value: ticketData.type, inline: true }
+            )
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [embed] });
+        
+        const user = await interaction.guild.members.fetch(ticketData.userId).catch(() => null);
+        if (user) {
+            user.send(`✅ Your ticket has been claimed by ${interaction.user.tag}!`).catch(() => {});
+        }
         return;
     }
     
+    // CLOSE TICKET
     if (interaction.customId === 'close_ticket') {
-        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticket.userId === interaction.user.id;
-        if (!hasPerm) return interaction.reply({ content: '❌ No permission!' });
-        await interaction.reply({ content: '🔒 Closing in 5 seconds...' });
+        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
+        if (!hasPerm) {
+            return interaction.reply({ content: '❌ You do not have permission to close this ticket!' });
+        }
+        
+        // Markeer als gesloten in database
+        await closeTicketInDB(interaction.channelId);
+        
+        const closeEmbed = new EmbedBuilder()
+            .setTitle('🔒 Closing Ticket')
+            .setDescription(`This ticket will be deleted in **5 seconds**. A transcript will be saved.`)
+            .setColor(0xff0000)
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [closeEmbed] });
+        
         setTimeout(async () => {
             await sendTranscript(interaction.channel, interaction);
             await interaction.channel.delete();
@@ -1301,12 +1479,16 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
+    // GET TRANSCRIPT
     if (interaction.customId === 'transcript') {
-        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticket.userId === interaction.user.id;
-        if (!hasPerm) return interaction.reply({ content: '❌ No permission!' });
-        await interaction.reply({ content: '📄 Generating...' });
+        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
+        if (!hasPerm) {
+            return interaction.reply({ content: '❌ You do not have permission to get transcript!' });
+        }
+        
+        await interaction.reply({ content: '📄 Generating transcript...' });
         await sendTranscript(interaction.channel, interaction);
-        await interaction.editReply({ content: '✅ Transcript sent!' });
+        await interaction.editReply({ content: '✅ Transcript has been sent to the transcript channel!' });
         return;
     }
 });
