@@ -370,7 +370,7 @@ async function sendRoleClaimMessage(guild) {
 }
 
 // ============================================
-// COMMAND INFO EMBED - ALLEEN COMMANDS
+// COMMAND INFO EMBED
 // ============================================
 async function sendCommandInfoMessage(guild) {
     const channel = guild.channels.cache.get(CONFIG.ROLE_INFO_CHANNEL_ID);
@@ -387,7 +387,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Send a message as the bot (supports @mentions, Shift+Enter for new line)', inline: false },
+            { name: '📝 `!send <message>`', value: 'Send a message as the bot (supports @mentions, just type !send and your message)', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -398,7 +398,7 @@ async function sendCommandInfoMessage(guild) {
             { name: '🎁 `/giveaccount <user>`', value: 'Give random account(s) to a user (choose category + amount)', inline: false },
             { name: '🎁 `/givebundle <user>`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account)', inline: false }
         )
-        .setFooter({ text: `Total commands: 10` })
+        .setFooter({ text: `Total commands: 10 | Use !send to send messages as the bot` })
         .setTimestamp();
     
     await channel.send({ embeds: [embed] });
@@ -586,7 +586,6 @@ async function verifyAllMembers(interaction) {
 // ============================================
 async function registerCommands(guild) {
     const commands = [
-        { name: 'send', description: 'Send a message as the bot (opens a modal, supports @mentions)', options: [] },
         {
             name: 'product',
             description: 'Create a product embed',
@@ -638,7 +637,7 @@ async function deleteOldCommands(guild) {
     try {
         const commands = await guild.commands.fetch();
         for (const command of commands.values()) {
-            if (!['send', 'product', 'clear', 'review', 'createpurchase', 'purchase', 'verifyall', 'addaccount', 'giveaccount', 'givebundle'].includes(command.name)) {
+            if (!['product', 'clear', 'review', 'createpurchase', 'purchase', 'verifyall', 'addaccount', 'giveaccount', 'givebundle'].includes(command.name)) {
                 await guild.commands.delete(command.id);
             }
         }
@@ -674,32 +673,61 @@ client.once('ready', async () => {
 });
 
 // ============================================
+// !SEND COMMAND - NORMAAL BERICHT (GEEN POPUP)
+// ============================================
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    
+    // Check for !send command
+    if (message.content.toLowerCase().startsWith('!send ')) {
+        // Check permission
+        if (!message.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
+            const errorMsg = await message.reply({ content: '❌ You do not have permission to use `!send`.', allowedMentions: { repliedUser: false } });
+            setTimeout(async () => {
+                await message.delete().catch(() => {});
+                await errorMsg.delete().catch(() => {});
+            }, 3000);
+            return;
+        }
+        
+        // Get message content (remove '!send ' which is 6 characters)
+        const msgContent = message.content.slice(6);
+        
+        if (!msgContent || msgContent.trim() === '') {
+            const errorMsg = await message.reply({ content: '❌ Usage: `!send your message here`', allowedMentions: { repliedUser: false } });
+            setTimeout(async () => {
+                await message.delete().catch(() => {});
+                await errorMsg.delete().catch(() => {});
+            }, 3000);
+            return;
+        }
+        
+        // Delete the command message
+        await message.delete().catch(() => {});
+        
+        // Send the message as the bot (supports @mentions automatically)
+        await message.channel.send(msgContent);
+        
+        console.log(`✅ Sent !send in #${message.channel.name} by ${message.author.tag}: ${msgContent.substring(0, 50)}`);
+        
+        // Log to log channel
+        const logChannel = message.guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
+        if (logChannel) {
+            const logEmbed = new EmbedBuilder()
+                .setTitle('📝 !send Command Used')
+                .setDescription(`**User:** ${message.author.tag} (${message.author.id})\n**Channel:** ${message.channel.name}\n**Message:** ${msgContent.substring(0, 500)}`)
+                .setColor(0xffaa00)
+                .setTimestamp();
+            await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+        }
+    }
+});
+
+// ============================================
 // SLASH COMMANDS HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
-    
-    // /send command - Opens a modal for multi-line messages (supports @mentions)
-    if (interaction.commandName === 'send') {
-        if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use `/send`.' });
-        }
-        const modal = new ModalBuilder()
-            .setCustomId('send_message_modal')
-            .setTitle('Send Message as Bot')
-            .addComponents(
-                new ActionRowBuilder().addComponents(
-                    new TextInputBuilder()
-                        .setCustomId('message_content')
-                        .setLabel('Message Content')
-                        .setStyle(TextInputStyle.Paragraph)
-                        .setPlaceholder('Type your message here... Use @username to tag people/roles\nShift+Enter for new line')
-                        .setRequired(true)
-                        .setMaxLength(4000)
-                )
-            );
-        await interaction.showModal(modal);
-    }
     
     // /product command
     if (interaction.commandName === 'product') {
@@ -996,7 +1024,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER (BERICHT BLIJFT STAAN)
+// GIVEACCOUNT AMOUNT MODAL HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1294,21 +1322,6 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.editReply({ content: '✅ Transcript sent!' });
         return;
     }
-});
-
-// ============================================
-// MODAL HANDLER FOR /send (MET MENTIONS)
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId !== 'send_message_modal') return;
-    
-    const messageContent = interaction.fields.getTextInputValue('message_content');
-    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.' });
-    
-    // Discord verwerkt @mentions automatisch
-    await interaction.channel.send(messageContent);
-    await interaction.reply({ content: '✅ Message sent!' });
 });
 
 // ============================================
