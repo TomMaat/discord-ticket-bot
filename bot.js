@@ -370,7 +370,7 @@ async function sendRoleClaimMessage(guild) {
 }
 
 // ============================================
-// COMMAND INFO EMBED - ALLE COMMANDS IN ENGELS
+// COMMAND INFO EMBED - ALLE COMMANDS IN ENGELS (16 FIELDS)
 // ============================================
 async function sendCommandInfoMessage(guild) {
     const channel = guild.channels.cache.get(CONFIG.ROLE_INFO_CHANNEL_ID);
@@ -388,35 +388,30 @@ async function sendCommandInfoMessage(guild) {
         .setThumbnail(LOGO_URL)
         .addFields(
             { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **TICKET COMMANDS** ⬇️', inline: false },
-            { name: '🎫 **Create Ticket**', value: 'Click the button in the support channel to create a ticket.\nChoose from: General Question, Purchase, or Buy Support.', inline: false },
-            { name: '🎯 **Claim Ticket**', value: 'Support staff can claim tickets using the **Claim Ticket** button in the ticket channel.', inline: false },
-            { name: '🔒 **Close Ticket**', value: 'Close a ticket using the **Close Ticket** button. A transcript will be saved.', inline: false },
-            { name: '📄 **Get Transcript**', value: 'Get a transcript of the ticket conversation using the **Get Transcript** button.', inline: false },
+            { name: '🎫 **Create Ticket**', value: 'Click the button in <#' + CONFIG.TICKET_CREATION_CHANNEL_ID + '> to create a ticket.\nChoose from: General Question, Purchase, or Buy Support.', inline: false },
+            { name: '🎯 **Claim / Close / Transcript**', value: 'Use the buttons in your ticket channel to claim, close, or get a transcript.', inline: false },
             
             { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ADMIN COMMANDS** ⬇️', inline: false },
             { name: '📝 `/send`', value: 'Open a modal to send a message as the bot. Supports multi-line messages with Shift+Enter.', inline: false },
-            { name: '🛒 `/product`', value: 'Create a product embed with name, stock status (yes/no), price, description, and image.', inline: false },
+            { name: '🛒 `/product`', value: 'Create a product embed with name, stock (yes/no), price, description, and image.', inline: false },
             { name: '🗑️ `/clear`', value: 'Clear messages from a channel. Usage: `/clear <amount>` (1-100 messages).', inline: false },
             { name: '⭐ `/review`', value: 'Leave a review for a product. Usage: `/review <stars> <product> <review>`', inline: false },
             { name: '📦 `/createpurchase`', value: 'Create a digital product for sale. Add text content or attach a file.', inline: false },
             { name: '🎁 `/purchase`', value: 'Purchase a product for a user. Select the product from a dropdown menu.', inline: false },
-            { name: '✅ `/verifyall`', value: 'Verify ALL members in the server. Adds the verified role and removes unverified role.', inline: false },
+            { name: '✅ `/verifyall`', value: 'Verify ALL members in the server. Adds verified role, removes unverified role.', inline: false },
             
             { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ACCOUNT STORAGE COMMANDS** ⬇️', inline: false },
             { name: '➕ `/addaccount`', value: 'Add an account to storage. Usage: `/addaccount type:<discord/steam/fivem> account:<details>`', inline: false },
-            { name: '🎁 `/giveaccount`', value: 'Give random account(s) to a user. First choose category, then enter amount.', inline: false },
+            { name: '🎁 `/giveaccount`', value: 'Give random account(s) to a user. Choose category, then enter amount.', inline: false },
             { name: '🎁 `/givebundle`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account) to a user.', inline: false },
-            { name: '🔄 **Refresh**', value: 'Click the **Refresh** button in any storage channel to update the display.', inline: false },
-            { name: '📋 **Export**', value: 'Click the **Export** button in any storage channel to download all accounts as a text file.', inline: false },
+            { name: '🔄 **Refresh & Export**', value: 'Click **Refresh** to update storage display. Click **Export** to download all accounts.', inline: false },
             
             { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **ROLE CLAIM** ⬇️', inline: false },
-            { name: '🎭 **Claim Roles**', value: `Go to <#${CONFIG.ROLE_CLAIM_CHANNEL_ID}> and click the buttons to claim or remove roles.`, inline: false },
-            { name: '📋 **Available Roles**', value: '• 🎭 Spoof Accounts\n• 🛒 Trigger Shop\n• 📜 Scripts\n• 💻 Cheats/Software\n• 🔄 IRL-Trading', inline: false },
-            { name: '✅ **Claim All**', value: 'Click the **Claim All Roles** button to get all available roles at once.', inline: false },
-            { name: '❌ **Remove All**', value: 'Click the **Remove All Roles** button to remove all claimed roles.', inline: false },
+            { name: '🎭 **Claim Roles**', value: `Go to <#${CONFIG.ROLE_CLAIM_CHANNEL_ID}> and click the buttons to claim or remove roles.\nAvailable: Spoof Accounts, Trigger Shop, Scripts, Cheats/Software, IRL-Trading`, inline: false },
+            { name: '✅ **Claim All / Remove All**', value: 'Use the green button to claim all roles, red button to remove all roles.', inline: false },
             
             { name: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', value: '⬇️ **VERIFICATION** ⬇️', inline: false },
-            { name: '✅ **Verify Yourself**', value: `Go to <#${CONFIG.VERIFICATION_CHANNEL_ID}> and click the **"Verify Me"** button to get access to all channels.`, inline: false }
+            { name: '✅ **Verify Yourself**', value: `Go to <#${CONFIG.VERIFICATION_CHANNEL_ID}> and click the **"Verify Me"** button to access all channels.`, inline: false }
         )
         .setFooter({ text: 'Use these commands to manage the server efficiently' })
         .setTimestamp();
@@ -685,7 +680,10 @@ client.once('ready', async () => {
         await sendCommandInfoMessage(guild);
         await updateAllStorageDisplays();
         
-        setInterval(async () => { await updateAllStorageDisplays(); }, 30000);
+        // Auto-refresh storage displays elke 5 minuten (300000 ms) in plaats van 30 seconden
+        setInterval(async () => {
+            await updateAllStorageDisplays();
+        }, 60000);
     }
     console.log('✅ Bot is fully ready!');
     const stats = await getStorageStats();
