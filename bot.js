@@ -387,7 +387,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Send a message as the bot (opens a modal, Shift+Enter for new line)', inline: false },
+            { name: '📝 `/send`', value: 'Send a message as the bot (supports @mentions, Shift+Enter for new line)', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -586,7 +586,7 @@ async function verifyAllMembers(interaction) {
 // ============================================
 async function registerCommands(guild) {
     const commands = [
-        { name: 'send', description: 'Send a message as the bot (opens a modal)', options: [] },
+        { name: 'send', description: 'Send a message as the bot (opens a modal, supports @mentions)', options: [] },
         {
             name: 'product',
             description: 'Create a product embed',
@@ -679,10 +679,10 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     
-    // /send command
+    // /send command - Opens a modal for multi-line messages (supports @mentions)
     if (interaction.commandName === 'send') {
         if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.' });
+            return interaction.reply({ content: '❌ You do not have permission to use `/send`.' });
         }
         const modal = new ModalBuilder()
             .setCustomId('send_message_modal')
@@ -693,7 +693,7 @@ client.on('interactionCreate', async (interaction) => {
                         .setCustomId('message_content')
                         .setLabel('Message Content')
                         .setStyle(TextInputStyle.Paragraph)
-                        .setPlaceholder('Type your message here... (Shift+Enter for new line)')
+                        .setPlaceholder('Type your message here... Use @username to tag people/roles\nShift+Enter for new line')
                         .setRequired(true)
                         .setMaxLength(4000)
                 )
@@ -1051,7 +1051,6 @@ client.on('interactionCreate', async (interaction) => {
         await targetUser.send({ embeds: [dmEmbed] });
     } catch (error) {}
     
-    // Bericht blijft staan (geen flags:64 en geen setTimeout)
     await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!` });
     await updateAllStorageDisplays();
 });
@@ -1298,7 +1297,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// MODAL HANDLER FOR /send
+// MODAL HANDLER FOR /send (MET MENTIONS)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1307,6 +1306,7 @@ client.on('interactionCreate', async (interaction) => {
     const messageContent = interaction.fields.getTextInputValue('message_content');
     if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.' });
     
+    // Discord verwerkt @mentions automatisch
     await interaction.channel.send(messageContent);
     await interaction.reply({ content: '✅ Message sent!' });
 });
