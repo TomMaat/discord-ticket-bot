@@ -175,6 +175,16 @@ const LOGO_URL = 'https://cdn.discordapp.com/attachments/1509665549410635787/150
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ============================================
+// STORAGE COOLDOWN SYSTEM
+// ============================================
+const lastStorageUpdate = {
+    discord: 0,
+    steam: 0,
+    fivem: 0
+};
+const STORAGE_COOLDOWN = 60000; // 1 minuut
+
+// ============================================
 // DATABASE FUNCTIES - STORAGE
 // ============================================
 async function addAccountToDB(type, accountId, content, addedBy, addedAt) {
@@ -294,11 +304,19 @@ async function getAllPurchasesFromDB() {
 }
 
 // ============================================
-// UPDATE STORAGE DISPLAYS
+// UPDATE STORAGE DISPLAYS MET COOLDOWN
 // ============================================
 async function updateStorageDisplayForType(type) {
     const guild = client.guilds.cache.first();
     if (!guild) return;
+    
+    // Check cooldown
+    const now = Date.now();
+    if (lastStorageUpdate[type] && (now - lastStorageUpdate[type]) < STORAGE_COOLDOWN) {
+        const remainingSeconds = Math.ceil((STORAGE_COOLDOWN - (now - lastStorageUpdate[type])) / 1000);
+        console.log(`⏳ ${type} storage update skipped (cooldown: ${remainingSeconds}s remaining)`);
+        return;
+    }
     
     let channelId, title, color;
     switch(type) {
@@ -323,10 +341,18 @@ async function updateStorageDisplayForType(type) {
     const storageChannel = guild.channels.cache.get(channelId);
     if (!storageChannel) return;
     
+    // Update cooldown timestamp
+    lastStorageUpdate[type] = now;
+    
     try {
         const messages = await storageChannel.messages.fetch();
-        if (messages.size > 0) await storageChannel.bulkDelete(messages);
-    } catch (error) {}
+        if (messages.size > 0) {
+            await storageChannel.bulkDelete(messages);
+            console.log(`🗑️ ${messages.size} oude berichten verwijderd uit ${type} kanaal`);
+        }
+    } catch (error) {
+        console.log(`⚠️ Kon niet alle berichten verwijderen in ${type} kanaal:`, error.message);
+    }
     
     const count = await getAccountCount(type);
     const accounts = await getAllAccountsByType(type);
@@ -347,6 +373,7 @@ async function updateStorageDisplayForType(type) {
     );
     
     await storageChannel.send({ embeds: [embed], components: [row] });
+    console.log(`✅ Nieuw storage bericht verzonden in ${type} kanaal`);
 }
 
 async function updateAllStorageDisplays() {
@@ -769,14 +796,21 @@ client.once('ready', async () => {
         await sendRoleClaimMessage(guild);
         await sendTicketMessage(guild);
         await sendCommandInfoMessage(guild);
-        await updateAllStorageDisplays();
         
+        // Initial storage display
+        await updateStorageDisplayForType('discord');
+        await updateStorageDisplayForType('steam');
+        await updateStorageDisplayForType('fivem');
+        
+        // Auto-refresh elke 5 minuten
         setInterval(async () => {
+            console.log('🔄 Auto-refresh storage displays...');
             await updateAllStorageDisplays();
         }, 300000);
     }
     console.log('✅ Bot is fully ready!');
-    console.log(`📦 Storage: Discord: ${await getAccountCount('discord')}, Steam: ${await getAccountCount('steam')}, FiveM: ${await getAccountCount('fivem')}`);
+    const stats = await getStorageStats();
+    console.log(`📦 Storage: Discord: ${stats.discord}, Steam: ${stats.steam}, FiveM: ${stats.fivem}`);
     console.log(`🎫 Open tickets: ${tickets.size}`);
 });
 
@@ -1221,11 +1255,26 @@ client.on('interactionCreate', async (interaction) => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     
-    // Refresh storage buttons
+    // Refresh storage buttons - MET COOLDOWN EN GEEN MELDING
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
+        
+        // Check cooldown
+        const now = Date.now();
+        if (lastStorageUpdate[type] && (now - lastStorageUpdate[type]) < STORAGE_COOLDOWN) {
+            const remainingSeconds = Math.ceil((STORAGE_COOLDOWN - (now - lastStorageUpdate[type])) / 1000);
+            await interaction.reply({ 
+                content: `⏳ Please wait ${remainingSeconds} seconds before refreshing again!`, 
+                ephemeral: true 
+            });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
+        }
+        
         await updateStorageDisplayForType(type);
+        // Stille update - geen melding naar kanaal
         await interaction.reply({ content: `🔄 ${type} storage refreshed!`, ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
         return;
     }
     
@@ -1330,9 +1379,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    // ============================================
     // VERIFICATION BUTTON - ALLEEN ZICHTBAAR VOOR DE GEBRUIKER
-    // ============================================
     if (interaction.customId === 'verify_button') {
         const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
         const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
@@ -1349,10 +1396,8 @@ client.on('interactionCreate', async (interaction) => {
             .setThumbnail(LOGO_URL)
             .setTimestamp();
         
-        // Alleen de gebruiker ziet dit bericht (ephemeral)
         await interaction.reply({ embeds: [embed], ephemeral: true });
         
-        // Log naar log channel (alleen voor admins)
         const logChannel = interaction.guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
         if (logChannel) {
             const logEmbed = new EmbedBuilder()
