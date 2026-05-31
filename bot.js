@@ -398,12 +398,18 @@ async function updateTicketCountVoiceChannel() {
     if (!guild) return;
     
     const voiceChannelId = CONFIG.TICKET_COUNT_VOICE_CHANNEL_ID;
-    if (!voiceChannelId) return;
+    if (!voiceChannelId) {
+        console.log('⚠️ TICKET_COUNT_VOICE_CHANNEL_ID not configured');
+        return;
+    }
     
     const voiceChannel = guild.channels.cache.get(voiceChannelId);
-    if (!voiceChannel) return;
+    if (!voiceChannel) {
+        console.log(`⚠️ Voice channel ${voiceChannelId} not found`);
+        return;
+    }
     
-    // Get current open tickets count
+    // Get current open tickets count from the tickets Map
     const openTicketsCount = tickets.size;
     
     // Convert numbers to bold serif characters
@@ -426,7 +432,7 @@ async function updateTicketCountVoiceChannel() {
     try {
         if (voiceChannel.name !== channelName) {
             await voiceChannel.setName(channelName);
-            console.log(`✅ Ticket count voice channel updated: ${channelName}`);
+            console.log(`✅ Ticket count voice channel updated: ${channelName} (${openTicketsCount} tickets)`);
         }
     } catch (error) {
         console.log(`❌ Failed to update voice channel name:`, error.message);
@@ -1131,10 +1137,10 @@ client.once('clientReady', async () => {
         // Initialize ticket count voice channel
         await updateTicketCountVoiceChannel();
         
-        // Update ticket count every minute
+        // Update ticket count every 30 seconds (faster updates)
         setInterval(async () => {
             await updateTicketCountVoiceChannel();
-        }, 60000);
+        }, 30000);
     }
     console.log('✅ Bot is fully ready!');
     const stats = await getStorageStats();
@@ -1861,7 +1867,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    // CLOSE TICKET
+    // CLOSE TICKET - THIS IS WHERE THE COUNTER DECREASES
     if (interaction.customId === 'close_ticket') {
         const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
         if (!hasPerm) {
@@ -1882,8 +1888,9 @@ client.on('interactionCreate', async (interaction) => {
             await sendTranscript(interaction.channel, interaction);
             await interaction.channel.delete();
             tickets.delete(interaction.channelId);
-            // Update voice channel after ticket is closed
+            // ✅ THIS UPDATES THE VOICE CHANNEL (DECREASES THE COUNT)
             await updateTicketCountVoiceChannel();
+            console.log(`🗑️ Ticket closed. Remaining tickets: ${tickets.size}`);
         }, 5000);
         return;
     }
