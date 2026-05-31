@@ -174,9 +174,7 @@ const joinedMembers = new Set();
 const LOGO_URL = 'https://cdn.discordapp.com/attachments/1509665549410635787/1509928894361370735/hexmods.png';
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ============================================
-// STORAGE COOLDOWN SYSTEM
-// ============================================
+// Cooldown voor storage refreshes
 const lastStorageUpdate = {
     discord: 0,
     steam: 0,
@@ -304,19 +302,11 @@ async function getAllPurchasesFromDB() {
 }
 
 // ============================================
-// UPDATE STORAGE DISPLAYS MET COOLDOWN
+// UPDATE STORAGE DISPLAYS (ALLEEN BIJ WIJZIGINGEN)
 // ============================================
 async function updateStorageDisplayForType(type) {
     const guild = client.guilds.cache.first();
     if (!guild) return;
-    
-    // Check cooldown
-    const now = Date.now();
-    if (lastStorageUpdate[type] && (now - lastStorageUpdate[type]) < STORAGE_COOLDOWN) {
-        const remainingSeconds = Math.ceil((STORAGE_COOLDOWN - (now - lastStorageUpdate[type])) / 1000);
-        console.log(`⏳ ${type} storage update skipped (cooldown: ${remainingSeconds}s remaining)`);
-        return;
-    }
     
     let channelId, title, color;
     switch(type) {
@@ -340,9 +330,6 @@ async function updateStorageDisplayForType(type) {
     
     const storageChannel = guild.channels.cache.get(channelId);
     if (!storageChannel) return;
-    
-    // Update cooldown timestamp
-    lastStorageUpdate[type] = now;
     
     try {
         const messages = await storageChannel.messages.fetch();
@@ -797,16 +784,10 @@ client.once('ready', async () => {
         await sendTicketMessage(guild);
         await sendCommandInfoMessage(guild);
         
-        // Initial storage display
+        // Alleen initial storage display bij opstarten
         await updateStorageDisplayForType('discord');
         await updateStorageDisplayForType('steam');
         await updateStorageDisplayForType('fivem');
-        
-        // Auto-refresh elke 5 minuten
-        setInterval(async () => {
-            console.log('🔄 Auto-refresh storage displays...');
-            await updateAllStorageDisplays();
-        }, 300000);
     }
     console.log('✅ Bot is fully ready!');
     const stats = await getStorageStats();
@@ -998,7 +979,9 @@ client.on('interactionCreate', async (interaction) => {
         await verifyAllMembers(interaction);
     }
     
-    // /addaccount command
+    // ============================================
+    // /ADDACCOUNT COMMAND - FIXED
+    // ============================================
     if (interaction.commandName === 'addaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
             return interaction.reply({ content: '❌ You do not have permission to add accounts.', ephemeral: true });
@@ -1008,18 +991,23 @@ client.on('interactionCreate', async (interaction) => {
         const accountData = interaction.options.getString('account');
         const accountId = Math.random().toString(36).substring(2, 10).toUpperCase();
         
+        // Opslaan in database
         await addAccountToDB(type, accountId, accountData, interaction.user.tag, Date.now());
         
         const embed = new EmbedBuilder()
             .setTitle(`✅ Account Added to ${type.charAt(0).toUpperCase() + type.slice(1)} Storage`)
-            .setDescription(`**Account ID:** \`${accountId}\``)
+            .setDescription(`**Account ID:** \`${accountId}\`\n**Content:** ${accountData.substring(0, 500)}`)
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .setFooter({ text: `Added by ${interaction.user.tag}` })
             .setTimestamp();
         
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        await updateAllStorageDisplays();
+        
+        // Refresh storage displays na toevoegen
+        await updateStorageDisplayForType(type);
+        
+        console.log(`✅ Account toegevoegd: ${type} - ${accountId} door ${interaction.user.tag}`);
     }
     
     // /giveaccount command
@@ -1097,6 +1085,8 @@ client.on('interactionCreate', async (interaction) => {
         } catch (error) {}
         
         await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, ephemeral: true });
+        
+        // Refresh alle storage displays na bundle
         await updateAllStorageDisplays();
     }
 });
@@ -1209,7 +1199,9 @@ client.on('interactionCreate', async (interaction) => {
     } catch (error) {}
     
     await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, ephemeral: true });
-    await updateAllStorageDisplays();
+    
+    // Refresh de specifieke storage display na het geven van accounts
+    await updateStorageDisplayForType(category);
 });
 
 // ============================================
@@ -1255,7 +1247,7 @@ client.on('interactionCreate', async (interaction) => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     
-    // Refresh storage buttons - MET COOLDOWN EN GEEN MELDING
+    // Refresh storage buttons - handmatige refresh met cooldown
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
         
@@ -1271,8 +1263,8 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
+        lastStorageUpdate[type] = now;
         await updateStorageDisplayForType(type);
-        // Stille update - geen melding naar kanaal
         await interaction.reply({ content: `🔄 ${type} storage refreshed!`, ephemeral: true });
         setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
         return;
@@ -1379,7 +1371,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    // VERIFICATION BUTTON - ALLEEN ZICHTBAAR VOOR DE GEBRUIKER
+    // VERIFICATION BUTTON
     if (interaction.customId === 'verify_button') {
         const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
         const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
@@ -1451,9 +1443,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    // ============================================
     // TICKET MANAGEMENT BUTTONS
-    // ============================================
     let ticketData = tickets.get(interaction.channelId);
     
     if (!ticketData) {
