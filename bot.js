@@ -301,7 +301,7 @@ async function getAllPurchasesFromDB() {
 }
 
 // ============================================
-// UPDATE STORAGE DISPLAYS (GEEN ACCOUNT ID)
+// UPDATE STORAGE DISPLAYS (MET NUMMERS)
 // ============================================
 async function updateStorageDisplayForType(type) {
     const guild = client.guilds.cache.first();
@@ -342,8 +342,8 @@ async function updateStorageDisplayForType(type) {
     
     const count = await getAccountCount(type);
     const accounts = await getAllAccountsByType(type);
-    // GEEN ACCOUNT ID - alleen content
-    const accountList = accounts.map(a => `${a.content.substring(0, 80)}...`).join('\n') || '`Geen accounts beschikbaar`';
+    // Genummerde accounts - compact
+    const accountList = accounts.map((a, index) => `${index + 1}. ${a.content.substring(0, 80)}...`).join('\n') || '`Geen accounts beschikbaar`';
     
     const embed = new EmbedBuilder()
         .setTitle(title)
@@ -978,7 +978,7 @@ client.on('interactionCreate', async (interaction) => {
         await verifyAllMembers(interaction);
     }
     
-    // /ADDACCOUNT COMMAND - ZONDER ACCOUNT ID
+    // /ADDACCOUNT COMMAND
     if (interaction.commandName === 'addaccount') {
         if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
             return interaction.reply({ content: '❌ You do not have permission to add accounts.', ephemeral: true });
@@ -1136,7 +1136,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER (ZONDER ACCOUNT ID)
+// GIVEACCOUNT AMOUNT MODAL HANDLER (MET NUMMERS)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1159,9 +1159,10 @@ client.on('interactionCreate', async (interaction) => {
     if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', ephemeral: true });
     
     const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
-    const accountsText = removedAccounts.map((a, i) => `**${i + 1}.** ${a.content}`).join('\n\n');
+    // Genummerde accounts - compact, geen grote spaties
+    const accountsText = removedAccounts.map((a, i) => `${i + 1}. ${a.content}`).join('\n');
     
-    // Embed in channel - ZONDER ACCOUNT ID
+    // Embed in channel
     const accountEmbed = new EmbedBuilder()
         .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s) Given**`)
         .setDescription(accountsText)
@@ -1177,7 +1178,7 @@ client.on('interactionCreate', async (interaction) => {
     
     await targetChannel.send({ embeds: [accountEmbed] });
     
-    // DM naar gebruiker - ZONDER ACCOUNT ID
+    // DM naar gebruiker
     try {
         const dmEmbed = new EmbedBuilder()
             .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s)**`)
@@ -1240,7 +1241,7 @@ client.on('interactionCreate', async (interaction) => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     
-    // Refresh storage buttons - handmatige refresh met cooldown
+    // Refresh storage buttons
     if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
         const type = interaction.customId.replace('refresh_', '');
         
@@ -1267,8 +1268,8 @@ client.on('interactionCreate', async (interaction) => {
         const type = interaction.customId.replace('export_', '');
         const accounts = await getAllAccountsByType(type);
         let exportText = `=== ${type.toUpperCase()} ACCOUNTS EXPORT ===\nExported at: ${new Date().toLocaleString()}\nTotal: ${accounts.length}\n\n`;
-        accounts.forEach(a => {
-            exportText += `Content: ${a.content}\nAdded by: ${a.added_by}\nAdded at: ${new Date(a.added_at).toLocaleString()}\n---\n`;
+        accounts.forEach((a, index) => {
+            exportText += `${index + 1}. ${a.content}\nAdded by: ${a.added_by}\nAdded at: ${new Date(a.added_at).toLocaleString()}\n---\n`;
         });
         const buffer = Buffer.from(exportText, 'utf-8');
         await interaction.reply({
