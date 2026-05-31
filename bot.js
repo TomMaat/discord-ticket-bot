@@ -117,8 +117,12 @@ const CONFIG = {
     GENERAL_CATEGORY_ID: process.env.GENERAL_CATEGORY_ID,
     PURCHASE_CATEGORY_ID: process.env.PURCHASE_CATEGORY_ID,
     BUY_SUPPORT_CATEGORY_ID: process.env.BUY_SUPPORT_CATEGORY_ID,
+    STAFF_APPLY_CATEGORY_ID: process.env.STAFF_APPLY_CATEGORY_ID,
+    CONTENT_CREATOR_CATEGORY_ID: process.env.CONTENT_CREATOR_CATEGORY_ID,
+    PARTNER_CATEGORY_ID: process.env.PARTNER_CATEGORY_ID,
     
     SUPPORT_ROLE_ID: process.env.SUPPORT_ROLE_ID || '1509664538281381908',
+    ADMIN_ROLE_ID: process.env.ADMIN_ROLE_ID,
     SEND_ROLE_ID: process.env.SEND_ROLE_ID,
     PRODUCT_ROLE_ID: process.env.PRODUCT_ROLE_ID,
     CLEAR_ROLE_ID: process.env.CLEAR_ROLE_ID,
@@ -384,7 +388,180 @@ async function updateMemberCount(guild) {
 }
 
 // ============================================
-// SUPPORT TICKET SYSTEM EMBED
+// APPLICATION MODAL FORMS
+// ============================================
+
+// Staff Application Modal
+async function showStaffApplicationModal(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('staff_application_modal')
+        .setTitle('📝 Staff Application')
+        .addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('staff_age')
+                    .setLabel('How old are you?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Enter your age')
+                    .setRequired(true)
+                    .setMinLength(1)
+                    .setMaxLength(3)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('staff_experience')
+                    .setLabel('Do you have any staff experience?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Describe your experience as staff on other servers...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('staff_availability')
+                    .setLabel('How many hours per week can you commit?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('e.g., 10-15 hours')
+                    .setRequired(true)
+                    .setMaxLength(50)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('staff_why')
+                    .setLabel('Why do you want to join our staff team?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Explain your motivation...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('staff_skills')
+                    .setLabel('What skills can you bring to the team?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('e.g., moderation, coding, community management...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            )
+        );
+    
+    await interaction.showModal(modal);
+}
+
+// Content Creator Application Modal
+async function showContentCreatorModal(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('content_creator_modal')
+        .setTitle('🎬 Content Creator Application')
+        .addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('creator_platform')
+                    .setLabel('What platform do you create content on?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('YouTube, Twitch, TikTok, etc.')
+                    .setRequired(true)
+                    .setMaxLength(100)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('creator_link')
+                    .setLabel('Link to your content/channel')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('https://...')
+                    .setRequired(true)
+                    .setMaxLength(200)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('creator_followers')
+                    .setLabel('How many followers/subscribers?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Enter your follower/subscriber count')
+                    .setRequired(true)
+                    .setMaxLength(50)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('creator_content')
+                    .setLabel('What type of content do you create?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Describe the content you usually create...')
+                    .setRequired(true)
+                    .setMaxLength(500)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('creator_why')
+                    .setLabel('Why do you want to partner with us?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Explain why you want to become a content creator for HexMods...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            )
+        );
+    
+    await interaction.showModal(modal);
+}
+
+// Partner Request Modal
+async function showPartnerModal(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('partner_modal')
+        .setTitle('🤝 Partner Request')
+        .addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('partner_server_name')
+                    .setLabel('What is your server name?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Enter your server name')
+                    .setRequired(true)
+                    .setMaxLength(100)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('partner_server_link')
+                    .setLabel('Link to your server')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Discord server invite link')
+                    .setRequired(true)
+                    .setMaxLength(200)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('partner_members')
+                    .setLabel('How many members does your server have?')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Enter member count')
+                    .setRequired(true)
+                    .setMaxLength(20)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('partner_benefits')
+                    .setLabel('What can you offer HexMods?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Describe what benefits your server can provide...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('partner_expectations')
+                    .setLabel('What do you expect from this partnership?')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Describe what you hope to gain...')
+                    .setRequired(true)
+                    .setMaxLength(1000)
+            )
+        );
+    
+    await interaction.showModal(modal);
+}
+
+// ============================================
+// SUPPORT TICKET SYSTEM EMBED (UPDATED WITH NEW OPTIONS)
 // ============================================
 async function sendTicketMessage(guild) {
     const channel = guild.channels.cache.get(CONFIG.TICKET_CREATION_CHANNEL_ID);
@@ -393,21 +570,31 @@ async function sendTicketMessage(guild) {
     await channel.bulkDelete(await channel.messages.fetch()).catch(() => {});
     
     const embed = new EmbedBuilder()
-        .setTitle('🎫 **SUPPORT TICKET SYSTEM**')
-        .setDescription('Need help? Click the button below to create a support ticket.')
+        .setTitle('🎫 **SUPPORT & APPLICATIONS**')
+        .setDescription('Need help or want to apply for a role? Click the button below to get started!')
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📋 How it works', value: '1️⃣ Click **"Create Ticket"** below\n2️⃣ Choose your category\n3️⃣ A private channel will be created\n4️⃣ Support will assist you', inline: false },
-            { name: '⏱️ Response Time', value: 'Usually within 24 hours', inline: true }
+            { name: '📋 **Support Options**', value: '• General Question\n• Purchase Support\n• Buy Support', inline: false },
+            { name: '📝 **Application Options**', value: '• Apply Staff\n• Apply Content Creator\n• Partner Request', inline: false },
+            { name: '⏱️ Response Time', value: 'Support: Within 24 hours\nApplications: Within 48 hours', inline: true }
         )
-        .setFooter({ text: 'Support System', iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: 'Select an option below to create a ticket', iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
     
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('create_ticket_menu').setLabel('Create Ticket').setStyle(ButtonStyle.Success).setEmoji('🎫')
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('general_ticket').setLabel('General Question').setStyle(ButtonStyle.Primary).setEmoji('📋'),
+        new ButtonBuilder().setCustomId('purchase_ticket').setLabel('Purchase').setStyle(ButtonStyle.Success).setEmoji('💰'),
+        new ButtonBuilder().setCustomId('buysupport_ticket').setLabel('Buy Support').setStyle(ButtonStyle.Danger).setEmoji('🛡️')
     );
-    await channel.send({ embeds: [embed], components: [row] });
+    
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('apply_staff').setLabel('Apply Staff').setStyle(ButtonStyle.Secondary).setEmoji('👔'),
+        new ButtonBuilder().setCustomId('apply_content_creator').setLabel('Apply Content Creator').setStyle(ButtonStyle.Secondary).setEmoji('🎬'),
+        new ButtonBuilder().setCustomId('apply_partner').setLabel('Partner Request').setStyle(ButtonStyle.Secondary).setEmoji('🤝')
+    );
+    
+    await channel.send({ embeds: [embed], components: [row1, row2] });
 }
 
 // ============================================
@@ -515,7 +702,106 @@ async function sendVerificationMessage(guild) {
 }
 
 // ============================================
-// TICKET CREATION
+// APPLICATION TICKET CREATION
+// ============================================
+async function createApplicationTicket(user, interaction, categoryId, type, applicationData = null) {
+    const guild = interaction.guild;
+    const supportRole = guild.roles.cache.get(CONFIG.SUPPORT_ROLE_ID);
+    const adminRole = guild.roles.cache.get(CONFIG.ADMIN_ROLE_ID);
+    
+    let prefix = '';
+    let pingRoles = `${supportRole}`;
+    
+    switch(type) {
+        case 'Staff Application':
+            prefix = 'staff-app';
+            if (adminRole) pingRoles += ` ${adminRole}`;
+            break;
+        case 'Content Creator Application':
+            prefix = 'creator-app';
+            if (adminRole) pingRoles += ` ${adminRole}`;
+            break;
+        case 'Partner Request':
+            prefix = 'partner';
+            if (adminRole) pingRoles += ` ${adminRole}`;
+            break;
+        default:
+            prefix = 'application';
+    }
+    
+    const channel = await guild.channels.create({
+        name: `${prefix}-${user.username.toLowerCase()}`,
+        type: ChannelType.GuildText,
+        parent: categoryId,
+        permissionOverwrites: [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            { id: supportRole.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] }
+        ]
+    });
+    
+    // Add admin role access for all application types
+    if (adminRole) {
+        await channel.permissionOverwrites.create(adminRole, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+        });
+    }
+    
+    const createdAt = Date.now();
+    await saveTicketToDB(channel.id, user.id, type, createdAt);
+    
+    tickets.set(channel.id, { 
+        userId: user.id, 
+        claimedBy: null, 
+        createdAt: createdAt, 
+        type: type 
+    });
+    
+    const embed = new EmbedBuilder()
+        .setTitle(getApplicationTitle(type))
+        .setDescription(`Welcome ${user}! Your application has been submitted.\n\n**Type:** ${type}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
+        .setColor(0x00ff00)
+        .setThumbnail(LOGO_URL)
+        .setTimestamp();
+    
+    // Add application data if provided
+    if (applicationData) {
+        embed.addFields(
+            { name: '📋 Application Details', value: applicationData, inline: false }
+        );
+    }
+    
+    embed.addFields(
+        { name: '📌 Instructions', value: '• **Claim Ticket** - Take ownership\n• **Close Ticket** - Delete ticket\n• **Get Transcript** - Save chat log', inline: false },
+        { name: '👤 Applicant', value: user.toString(), inline: true }
+    );
+    
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('claim_ticket').setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎯'),
+        new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒'),
+        new ButtonBuilder().setCustomId('transcript').setLabel('Get Transcript').setStyle(ButtonStyle.Secondary).setEmoji('📄')
+    );
+    
+    await channel.send({ content: `${user} ${pingRoles}`, embeds: [embed], components: [row] });
+    
+    console.log(`✅ ${type} created: ${channel.id} for user ${user.id}`);
+    
+    return channel;
+}
+
+function getApplicationTitle(type) {
+    switch(type) {
+        case 'Staff Application': return '👔 **STAFF APPLICATION**';
+        case 'Content Creator Application': return '🎬 **CONTENT CREATOR APPLICATION**';
+        case 'Partner Request': return '🤝 **PARTNER REQUEST**';
+        default: return '📝 **APPLICATION**';
+    }
+}
+
+// ============================================
+// TICKET CREATION (SUPPORT TICKETS)
 // ============================================
 async function createTicket(user, interaction, categoryId, type) {
     const guild = interaction.guild;
@@ -764,7 +1050,7 @@ async function deleteOldCommands(guild) {
 }
 
 // ============================================
-// CLIENT READY EVENT (FIXED: changed from 'ready' to 'clientReady')
+// CLIENT READY EVENT
 // ============================================
 client.once('clientReady', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
@@ -794,7 +1080,7 @@ client.once('clientReady', async () => {
 });
 
 // ============================================
-// SLASH COMMANDS HANDLER (ALLES flags: 64, GEEN ephemeral)
+// SLASH COMMANDS HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
@@ -1084,6 +1370,64 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
+// APPLICATION MODAL HANDLERS
+// ============================================
+
+// Staff Application Modal Handler
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isModalSubmit()) return;
+    if (interaction.customId !== 'staff_application_modal') return;
+    
+    const age = interaction.fields.getTextInputValue('staff_age');
+    const experience = interaction.fields.getTextInputValue('staff_experience');
+    const availability = interaction.fields.getTextInputValue('staff_availability');
+    const why = interaction.fields.getTextInputValue('staff_why');
+    const skills = interaction.fields.getTextInputValue('staff_skills');
+    
+    const applicationText = `**Age:** ${age}\n**Experience:** ${experience}\n**Availability:** ${availability}\n**Why Join:** ${why}\n**Skills:** ${skills}`;
+    
+    await interaction.reply({ content: '📝 Creating your staff application...', flags: 64 });
+    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.STAFF_APPLY_CATEGORY_ID, 'Staff Application', applicationText);
+    await interaction.editReply({ content: `✅ Staff application created: ${channel}`, flags: 64 });
+});
+
+// Content Creator Modal Handler
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isModalSubmit()) return;
+    if (interaction.customId !== 'content_creator_modal') return;
+    
+    const platform = interaction.fields.getTextInputValue('creator_platform');
+    const link = interaction.fields.getTextInputValue('creator_link');
+    const followers = interaction.fields.getTextInputValue('creator_followers');
+    const content = interaction.fields.getTextInputValue('creator_content');
+    const why = interaction.fields.getTextInputValue('creator_why');
+    
+    const applicationText = `**Platform:** ${platform}\n**Channel Link:** ${link}\n**Followers/Subscribers:** ${followers}\n**Content Type:** ${content}\n**Why Partner:** ${why}`;
+    
+    await interaction.reply({ content: '🎬 Creating your content creator application...', flags: 64 });
+    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.CONTENT_CREATOR_CATEGORY_ID, 'Content Creator Application', applicationText);
+    await interaction.editReply({ content: `✅ Content creator application created: ${channel}`, flags: 64 });
+});
+
+// Partner Request Modal Handler
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isModalSubmit()) return;
+    if (interaction.customId !== 'partner_modal') return;
+    
+    const serverName = interaction.fields.getTextInputValue('partner_server_name');
+    const serverLink = interaction.fields.getTextInputValue('partner_server_link');
+    const members = interaction.fields.getTextInputValue('partner_members');
+    const benefits = interaction.fields.getTextInputValue('partner_benefits');
+    const expectations = interaction.fields.getTextInputValue('partner_expectations');
+    
+    const applicationText = `**Server Name:** ${serverName}\n**Server Link:** ${serverLink}\n**Member Count:** ${members}\n**Benefits to HexMods:** ${benefits}\n**Expectations:** ${expectations}`;
+    
+    await interaction.reply({ content: '🤝 Creating your partner request...', flags: 64 });
+    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.PARTNER_CATEGORY_ID, 'Partner Request', applicationText);
+    await interaction.editReply({ content: `✅ Partner request created: ${channel}`, flags: 64 });
+});
+
+// ============================================
 // GIVEACCOUNT CATEGORY SELECTION HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
@@ -1121,7 +1465,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER (flags: 64)
+// GIVEACCOUNT AMOUNT MODAL HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1365,30 +1709,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     
-    if (interaction.customId === 'create_ticket_menu') {
-        const embed = new EmbedBuilder()
-            .setTitle('🎫 **CREATE A SUPPORT TICKET**')
-            .setDescription('Select a category:')
-            .setColor(0x5865F2)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '📋 **General Question**', value: 'General inquiries', inline: false },
-                { name: '💰 **Purchase**', value: 'Payment issues', inline: false },
-                { name: '🛡️ **Buy Support**', value: 'Premium support', inline: false }
-            )
-            .setFooter({ text: 'Choose carefully' })
-            .setTimestamp();
-        
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('general_ticket').setLabel('General Question').setStyle(ButtonStyle.Primary).setEmoji('📋'),
-            new ButtonBuilder().setCustomId('purchase_ticket').setLabel('Purchase').setStyle(ButtonStyle.Success).setEmoji('💰'),
-            new ButtonBuilder().setCustomId('buysupport_ticket').setLabel('Buy Support').setStyle(ButtonStyle.Danger).setEmoji('🛡️')
-        );
-        await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
-        return;
-    }
-    
-    // Ticket category selection
+    // Support ticket category selection
     let catId = null, type = null;
     if (interaction.customId === 'general_ticket') { catId = CONFIG.GENERAL_CATEGORY_ID; type = 'General Question'; }
     else if (interaction.customId === 'purchase_ticket') { catId = CONFIG.PURCHASE_CATEGORY_ID; type = 'Purchase'; }
@@ -1401,6 +1722,31 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: `🎫 Creating ${type} ticket...`, flags: 64 });
         const channel = await createTicket(interaction.user, interaction, catId, type);
         await interaction.editReply({ content: `✅ Ticket created: ${channel}`, flags: 64 });
+        return;
+    }
+    
+    // Application buttons
+    if (interaction.customId === 'apply_staff') {
+        for (const [, data] of tickets) {
+            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        }
+        await showStaffApplicationModal(interaction);
+        return;
+    }
+    
+    if (interaction.customId === 'apply_content_creator') {
+        for (const [, data] of tickets) {
+            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        }
+        await showContentCreatorModal(interaction);
+        return;
+    }
+    
+    if (interaction.customId === 'apply_partner') {
+        for (const [, data] of tickets) {
+            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        }
+        await showPartnerModal(interaction);
         return;
     }
     
