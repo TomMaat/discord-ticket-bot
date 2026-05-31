@@ -342,7 +342,6 @@ async function updateStorageDisplayForType(type) {
     
     const count = await getAccountCount(type);
     const accounts = await getAllAccountsByType(type);
-    // Genummerde accounts - compact
     const accountList = accounts.map((a, index) => `${index + 1}. ${a.content.substring(0, 80)}...`).join('\n') || '`Geen accounts beschikbaar`';
     
     const embed = new EmbedBuilder()
@@ -1035,7 +1034,7 @@ client.on('interactionCreate', async (interaction) => {
         });
     }
     
-    // /givebundle command
+    // /givebundle command (GEEN DM)
     if (interaction.commandName === 'givebundle') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
             return interaction.reply({ content: '❌ You do not have permission to give bundles.', ephemeral: true });
@@ -1064,19 +1063,7 @@ client.on('interactionCreate', async (interaction) => {
         
         await interaction.channel.send({ embeds: [bundleEmbed] });
         
-        try {
-            const dmEmbed = new EmbedBuilder()
-                .setTitle(`🎁 **Bundle Received!**`)
-                .setDescription(`**Discord Account:**\n${bundle.discord.content}\n\n**Steam Account:**\n${bundle.steam.content}\n\n**FiveM Account:**\n${bundle.fivem.content}`)
-                .setColor(0x00ff00)
-                .setThumbnail(LOGO_URL)
-                .addFields(
-                    { name: '📅 Ontvangen op', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                    { name: '🔒 Note', value: 'Keep this message private.', inline: true }
-                )
-                .setTimestamp();
-            await user.send({ embeds: [dmEmbed] });
-        } catch (error) {}
+        // GEEN DM NAAR DE GEBRUIKER
         
         await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, ephemeral: true });
         
@@ -1136,7 +1123,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER (MET NUMMERS)
+// GIVEACCOUNT AMOUNT MODAL HANDLER (GEEN DM)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
@@ -1159,10 +1146,8 @@ client.on('interactionCreate', async (interaction) => {
     if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', ephemeral: true });
     
     const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
-    // Genummerde accounts - compact, geen grote spaties
     const accountsText = removedAccounts.map((a, i) => `${i + 1}. ${a.content}`).join('\n');
     
-    // Embed in channel
     const accountEmbed = new EmbedBuilder()
         .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s) Given**`)
         .setDescription(accountsText)
@@ -1178,20 +1163,7 @@ client.on('interactionCreate', async (interaction) => {
     
     await targetChannel.send({ embeds: [accountEmbed] });
     
-    // DM naar gebruiker
-    try {
-        const dmEmbed = new EmbedBuilder()
-            .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s)**`)
-            .setDescription(accountsText)
-            .setColor(0x00ff00)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '📅 Received at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: '🔒 Note', value: 'Keep this message private.', inline: true }
-            )
-            .setTimestamp();
-        await targetUser.send({ embeds: [dmEmbed] });
-    } catch (error) {}
+    // GEEN DM NAAR DE GEBRUIKER
     
     await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, ephemeral: true });
     
