@@ -152,6 +152,9 @@ const CONFIG = {
     STORAGE_STEAM_CHANNEL_ID: process.env.STORAGE_STEAM_CHANNEL_ID,
     STORAGE_FIVEM_CHANNEL_ID: process.env.STORAGE_FIVEM_CHANNEL_ID,
     
+    // Voice channel for ticket count
+    TICKET_COUNT_VOICE_CHANNEL_ID: process.env.TICKET_COUNT_VOICE_CHANNEL_ID,
+    
     TOKEN: process.env.TOKEN
 };
 
@@ -388,6 +391,49 @@ async function updateMemberCount(guild) {
 }
 
 // ============================================
+// UPDATE TICKET COUNT VOICE CHANNEL
+// ============================================
+async function updateTicketCountVoiceChannel() {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+    
+    const voiceChannelId = CONFIG.TICKET_COUNT_VOICE_CHANNEL_ID;
+    if (!voiceChannelId) return;
+    
+    const voiceChannel = guild.channels.cache.get(voiceChannelId);
+    if (!voiceChannel) return;
+    
+    // Get current open tickets count
+    const openTicketsCount = tickets.size;
+    
+    // Convert numbers to bold serif characters
+    const boldNumbers = {
+        '0': '𝟎', '1': '𝟏', '2': '𝟐', '3': '𝟑', '4': '𝟒',
+        '5': '𝟓', '6': '𝟔', '7': '𝟕', '8': '𝟖', '9': '𝟗'
+    };
+    
+    // Convert the count to bold numbers
+    const countStr = openTicketsCount.toString();
+    let boldCount = '';
+    for (const char of countStr) {
+        boldCount += boldNumbers[char] || char;
+    }
+    
+    // Create the channel name
+    const channelName = `𝐎𝐩𝐞𝐧 𝐓𝐢𝐜𝐤𝐞𝐭𝐬: ${boldCount}`;
+    
+    // Update the voice channel name
+    try {
+        if (voiceChannel.name !== channelName) {
+            await voiceChannel.setName(channelName);
+            console.log(`✅ Ticket count voice channel updated: ${channelName}`);
+        }
+    } catch (error) {
+        console.log(`❌ Failed to update voice channel name:`, error.message);
+    }
+}
+
+// ============================================
 // APPLICATION MODAL FORMS
 // ============================================
 
@@ -577,7 +623,7 @@ async function sendTicketMessage(guild) {
         .addFields(
             { name: '📋 **Support Options**', value: '• General Question\n• Purchase Support\n• Buy Support', inline: false },
             { name: '📝 **Application Options**', value: '• Apply Staff\n• Apply Content Creator\n• Partner Request', inline: false },
-            { name: '⏱️ Response Time', value: 'Support: Within 2 hours\nApplications: Within 2 hours', inline: true }
+            { name: '⏱️ Response Time', value: '**Support:** Within 2 hours\n**Applications:** Within 24 hours', inline: true }
         )
         .setFooter({ text: 'Select an option below to create a ticket', iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
@@ -759,6 +805,9 @@ async function createApplicationTicket(user, interaction, categoryId, type, appl
         type: type 
     });
     
+    // Update voice channel with new ticket count
+    await updateTicketCountVoiceChannel();
+    
     const embed = new EmbedBuilder()
         .setTitle(getApplicationTitle(type))
         .setDescription(`Welcome ${user}! Your application has been submitted.\n\n**Type:** ${type}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
@@ -829,6 +878,9 @@ async function createTicket(user, interaction, categoryId, type) {
         type: type 
     });
     
+    // Update voice channel with new ticket count
+    await updateTicketCountVoiceChannel();
+    
     const embed = new EmbedBuilder()
         .setTitle(`🎫 ${type} Ticket`)
         .setDescription(`Welcome ${user}! Your ticket has been created.\n\n**Type:** ${type}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
@@ -878,6 +930,9 @@ async function createPurchaseTicket(user, interaction, productName, price) {
         createdAt: createdAt, 
         type: 'Purchase' 
     });
+    
+    // Update voice channel with new ticket count
+    await updateTicketCountVoiceChannel();
     
     const embed = new EmbedBuilder()
         .setTitle(`🛒 Purchase Ticket`)
@@ -1072,6 +1127,14 @@ client.once('clientReady', async () => {
         await updateStorageDisplayForType('discord');
         await updateStorageDisplayForType('steam');
         await updateStorageDisplayForType('fivem');
+        
+        // Initialize ticket count voice channel
+        await updateTicketCountVoiceChannel();
+        
+        // Update ticket count every minute
+        setInterval(async () => {
+            await updateTicketCountVoiceChannel();
+        }, 60000);
     }
     console.log('✅ Bot is fully ready!');
     const stats = await getStorageStats();
@@ -1819,6 +1882,8 @@ client.on('interactionCreate', async (interaction) => {
             await sendTranscript(interaction.channel, interaction);
             await interaction.channel.delete();
             tickets.delete(interaction.channelId);
+            // Update voice channel after ticket is closed
+            await updateTicketCountVoiceChannel();
         }, 5000);
         return;
     }
