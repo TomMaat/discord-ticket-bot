@@ -764,9 +764,9 @@ async function deleteOldCommands(guild) {
 }
 
 // ============================================
-// READY EVENT
+// CLIENT READY EVENT (FIXED: changed from 'ready' to 'clientReady')
 // ============================================
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
     await initDatabase();
     
@@ -794,7 +794,7 @@ client.once('ready', async () => {
 });
 
 // ============================================
-// SLASH COMMANDS HANDLER (GEEN ephemeral MEER, ALLEEN flags: 64)
+// SLASH COMMANDS HANDLER (ALLES flags: 64, GEEN ephemeral)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
@@ -1121,7 +1121,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER (GEEN DM, flags: 64)
+// GIVEACCOUNT AMOUNT MODAL HANDLER (flags: 64)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
