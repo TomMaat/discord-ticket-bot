@@ -577,7 +577,7 @@ async function sendTicketMessage(guild) {
         .addFields(
             { name: '📋 **Support Options**', value: '• General Question\n• Purchase Support\n• Buy Support', inline: false },
             { name: '📝 **Application Options**', value: '• Apply Staff\n• Apply Content Creator\n• Partner Request', inline: false },
-            { name: '⏱️ Response Time', value: 'Support: Within 24 hours\nApplications: Within 48 hours', inline: true }
+            { name: '⏱️ Response Time', value: 'Support: Within 2 hours\nApplications: Within 2 hours', inline: true }
         )
         .setFooter({ text: 'Select an option below to create a ticket', iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
