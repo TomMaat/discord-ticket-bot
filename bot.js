@@ -1492,935 +1492,908 @@ client.once('clientReady', async () => {
 });
 
 // ============================================
-// SLASH COMMANDS HANDLER
+// SINGLE INTERACTION HANDLER (FIXED - NO CONFLICTS)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-    
-    // /send command - IMPROVED with proper parsing
-    if (interaction.commandName === 'send') {
-        if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
-        }
-        
-        const modal = new ModalBuilder()
-            .setCustomId('send_message_modal')
-            .setTitle('Send Message as Bot')
-            .addComponents(
-                new ActionRowBuilder().addComponents(
-                    new TextInputBuilder()
-                        .setCustomId('message_content')
-                        .setLabel('Message Content')
-                        .setStyle(TextInputStyle.Paragraph)
-                        .setPlaceholder('Type your message here...\n\nYou can use:\n• @username to tag people\n• #channel to tag channels\n• Shift+Enter for new line\n• @everyone or @here')
-                        .setRequired(true)
-                        .setMaxLength(4000)
-                )
-            );
-        
-        await interaction.showModal(modal);
-    }
-    
-    // /product command
-    if (interaction.commandName === 'product') {
-        if (!interaction.member.roles.cache.has(CONFIG.PRODUCT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
-        }
-        const name = interaction.options.getString('name');
-        const inStock = interaction.options.getString('instock') === 'yes';
-        const price = interaction.options.getString('price');
-        const desc = interaction.options.getString('description') || 'No description';
-        const img = interaction.options.getString('image');
-        
-        const embed = new EmbedBuilder()
-            .setTitle(name)
-            .setDescription(desc)
-            .setColor(inStock ? 0x00ff00 : 0xff0000)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '💰 Price', value: price, inline: true },
-                { name: '📦 Stock', value: inStock ? '✅ IN STOCK' : '❌ OUT OF STOCK', inline: true },
-                { name: '📅 Listed', value: new Date().toLocaleDateString(), inline: true }
-            )
-            .setTimestamp();
-        if (img?.startsWith('http')) embed.setImage(img);
-        
-        const btnId = `buy_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(btnId).setLabel('Buy Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
-            new ButtonBuilder().setCustomId('more_info').setLabel('More Info').setStyle(ButtonStyle.Primary).setEmoji('❓')
-        );
-        
-        if (!client.products) client.products = new Map();
-        client.products.set(btnId, { name, price });
-        
-        await interaction.channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: '✅ Product posted!', flags: 64 });
-    }
-    
-    // /clear command
-    if (interaction.commandName === 'clear') {
-        if (!interaction.member.roles.cache.has(CONFIG.CLEAR_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
-        }
-        const amount = interaction.options.getInteger('amount');
-        if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.', flags: 64 });
-        
-        await interaction.deferReply({ flags: 64 });
-        try {
-            const messages = await interaction.channel.messages.fetch({ limit: amount });
-            if (messages.size === 0) return interaction.editReply({ content: '❌ No messages.' });
-            await interaction.channel.bulkDelete(messages, true);
-            await interaction.editReply({ content: `✅ Cleared ${messages.size} messages.` });
-        } catch {
-            await interaction.editReply({ content: '❌ Failed. Messages may be too old.' });
-        }
-    }
-    
-    // /review command
-    if (interaction.commandName === 'review') {
-        if (!interaction.member.roles.cache.has(CONFIG.REVIEW_ROLE_ID)) {
-            return interaction.reply({ content: '❌ No permission.', flags: 64 });
-        }
-        const stars = interaction.options.getInteger('stars');
-        const product = interaction.options.getString('product');
-        const reviewText = interaction.options.getString('review');
-        const starsDisplay = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
-        const color = stars === 3 ? 0xffaa00 : (stars >= 4 ? 0x00ff00 : 0xff0000);
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`📝 Review for ${product}`)
-            .setDescription(`"${reviewText}"`)
-            .setColor(color)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '⭐ Rating', value: `${starsDisplay} (${stars}/5)`, inline: true },
-                { name: '🛒 Product', value: product, inline: true },
-                { name: '👤 Reviewer', value: interaction.user.tag, inline: true }
-            )
-            .setTimestamp();
-        
-        const reviewChannel = interaction.guild.channels.cache.get(CONFIG.REVIEW_CHANNEL_ID);
-        if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!', flags: 64 });
-        await reviewChannel.send({ embeds: [embed] });
-        await interaction.reply({ content: `✅ Review posted!`, flags: 64 });
-    }
-    
-    // /createpurchase command
-    if (interaction.commandName === 'createpurchase') {
-        if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to create purchases.', flags: 64 });
-        }
-        
-        const name = interaction.options.getString('name');
-        const content = interaction.options.getString('content');
-        let attachmentUrl = null, attachmentName = null;
-        
-        if (interaction.options.getAttachment('file')) {
-            const attachment = interaction.options.getAttachment('file');
-            attachmentUrl = attachment.url;
-            attachmentName = attachment.name;
-        }
-        
-        let finalContent = content || '';
-        if (attachmentUrl) {
-            if (finalContent) finalContent += '\n\n';
-            finalContent += `📎 **File:** ${attachmentName}\n🔗 **Download:** ${attachmentUrl}`;
-        }
-        
-        if (!finalContent || finalContent.trim() === '') {
-            return interaction.reply({ content: '❌ Please provide either text content or a file.', flags: 64 });
-        }
-        
-        await addPurchaseToDB(name.toLowerCase(), name, finalContent, interaction.user.tag, Date.now(), !!attachmentUrl, attachmentUrl, attachmentName);
-        await interaction.reply({ content: `✅ Purchase option **${name}** has been created!`, flags: 64 });
-    }
-    
-    // /purchase command
-    if (interaction.commandName === 'purchase') {
-        if (!interaction.member.roles.cache.has(CONFIG.PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to purchase products.', flags: 64 });
-        }
-        
-        const buyer = interaction.options.getUser('user');
-        const purchases = await getAllPurchasesFromDB();
-        
-        if (purchases.size === 0) {
-            return interaction.reply({ content: '❌ No products available!', flags: 64 });
-        }
-        
-        const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId(`purchase_select_${buyer.id}_${interaction.channelId}`)
-            .setPlaceholder('Select a product to purchase')
-            .addOptions(
-                Array.from(purchases.values()).map(product => {
-                    return new StringSelectMenuOptionBuilder()
-                        .setLabel(product.originalName.length > 100 ? product.originalName.substring(0, 97) + '...' : product.originalName)
-                        .setDescription(`Created: ${new Date(product.createdAt).toLocaleDateString()}`)
-                        .setValue(product.name)
-                        .setEmoji('🛍️');
-                })
-            );
-        
-        await interaction.reply({
-            content: `📦 **Select a product to purchase for ${buyer}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)],
-            flags: 64
-        });
-    }
-    
-    // /verifyall command
-    if (interaction.commandName === 'verifyall') {
-        if (!interaction.member.roles.cache.has(CONFIG.VERIFYALL_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to use /verifyall.', flags: 64 });
-        }
-        await verifyAllMembers(interaction);
-    }
-    
-    // /ADDACCOUNT COMMAND
-    if (interaction.commandName === 'addaccount') {
-        if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to add accounts.', flags: 64 });
-        }
-        
-        const type = interaction.options.getString('type');
-        const accountData = interaction.options.getString('account');
-        const accountId = Math.random().toString(36).substring(2, 10).toUpperCase();
-        
-        await addAccountToDB(type, accountId, accountData, interaction.user.tag, Date.now());
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`✅ Account Added to ${type.charAt(0).toUpperCase() + type.slice(1)} Storage`)
-            .setDescription(accountData)
-            .setColor(0x00ff00)
-            .setThumbnail(LOGO_URL)
-            .setFooter({ text: `Added by ${interaction.user.tag}` })
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed], flags: 64 });
-        
-        await updateStorageDisplayForType(type);
-        
-        console.log(`✅ Account added: ${type} by ${interaction.user.tag}`);
-    }
-    
-    // /giveaccount command
-    if (interaction.commandName === 'giveaccount') {
-        if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give accounts.', flags: 64 });
-        }
-        
-        const user = interaction.options.getUser('user');
-        const stats = await getStorageStats();
-        
-        if (stats.total === 0) {
-            return interaction.reply({ content: '❌ No accounts available!', flags: 64 });
-        }
-        
-        const categoryOptions = [];
-        if (stats.discord > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('💬 Discord Accounts').setDescription(`${stats.discord} available`).setValue('discord').setEmoji('💬'));
-        if (stats.steam > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('🎮 Steam Accounts').setDescription(`${stats.steam} available`).setValue('steam').setEmoji('🎮'));
-        if (stats.fivem > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('🚗 FiveM Accounts').setDescription(`${stats.fivem} available`).setValue('fivem').setEmoji('🚗'));
-        
-        const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId(`giveaccount_category_${user.id}_${interaction.channelId}`)
-            .setPlaceholder('Select a category...')
-            .addOptions(categoryOptions);
-        
-        await interaction.reply({
-            content: `📦 **Select a category to give an account to ${user}**`,
-            components: [new ActionRowBuilder().addComponents(selectMenu)],
-            flags: 64
-        });
-    }
-    
-    // /givebundle command
-    if (interaction.commandName === 'givebundle') {
-        if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to give bundles.', flags: 64 });
-        }
-        
-        const user = interaction.options.getUser('user');
-        const bundleAvailable = await isBundleAvailable();
-        
-        if (!bundleAvailable) {
-            return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.', flags: 64 });
-        }
-        
-        const bundle = await giveBundle();
-        if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.', flags: 64 });
-        
-        const bundleEmbed = new EmbedBuilder()
-            .setTitle(`🎁 **Bundle Given to ${user.tag}**`)
-            .setDescription(`**Discord Account:**\n${bundle.discord.content}\n\n**Steam Account:**\n${bundle.steam.content}\n\n**FiveM Account:**\n${bundle.fivem.content}`)
-            .setColor(0x00ff00)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '👤 Given by', value: interaction.user.tag, inline: true },
-                { name: '📅 Given at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-            )
-            .setTimestamp();
-        
-        await interaction.channel.send({ embeds: [bundleEmbed] });
-        
-        await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, flags: 64 });
-        
-        await updateAllStorageDisplays();
-    }
-    
-    // /GIVEAWAY COMMAND
-    if (interaction.commandName === 'giveaway') {
-        if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to start giveaways!', flags: 64 });
-        }
-        
-        const winners = interaction.options.getInteger('winners');
-        const items = interaction.options.getString('items');
-        const timeStr = interaction.options.getString('time');
-        
-        if (winners < 1 || winners > 10) {
-            return interaction.reply({ content: '❌ Winners must be between 1 and 10!', flags: 64 });
-        }
-        
-        const timeMs = parseTimeToMs(timeStr);
-        if (!timeMs) {
-            return interaction.reply({ content: '❌ Invalid time format! Use: 30m, 1h, 2d, etc.', flags: 64 });
-        }
-        
-        const endTime = Date.now() + timeMs;
-        const giveawayChannel = interaction.guild.channels.cache.get(CONFIG.GIVEAWAY_CHANNEL_ID);
-        if (!giveawayChannel) {
-            return interaction.reply({ content: '❌ Giveaway channel not configured!', flags: 64 });
-        }
-        
-        const embed = await createGiveawayEmbed({ winners, items }, endTime);
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`enter_giveaway_temp`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
-        );
-        
-        const message = await giveawayChannel.send({ embeds: [embed], components: [row] });
-        
-        const giveawayId = await saveGiveawayToDB(message.id, giveawayChannel.id, winners, items, endTime, 'Hex Mods', Date.now());
-        
-        const updatedRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`enter_giveaway_${giveawayId}`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
-        );
-        await message.edit({ components: [updatedRow] });
-        
-        await interaction.reply({ content: `✅ Giveaway started in ${giveawayChannel}!`, flags: 64 });
-        
-        setTimeout(async () => {
-            await endGiveaway(giveawayId, message.id, giveawayChannel.id);
-        }, timeMs);
-    }
-    
-    // /REROLL COMMAND
-    if (interaction.commandName === 'reroll') {
-        if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to reroll giveaways!', flags: 64 });
-        }
-        
-        const giveawayId = parseInt(interaction.options.getString('giveaway_id'));
-        if (isNaN(giveawayId)) {
-            return interaction.reply({ content: '❌ Invalid giveaway ID!', flags: 64 });
-        }
-        
-        const giveaway = await getGiveawayById(giveawayId);
-        if (!giveaway) {
-            return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
-        }
-        
-        const entries = await getGiveawayEntries(giveawayId);
-        const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
-        
-        let eligibleEntries = [];
-        for (const userId of entries) {
+    // Handle MODAL SUBMITS first
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'send_message_modal') {
+            // Defer the reply immediately to prevent timeout
+            await interaction.deferReply({ flags: 64 });
+            
+            const messageContent = interaction.fields.getTextInputValue('message_content');
+            if (!messageContent?.trim()) {
+                return interaction.editReply({ content: '❌ Please provide a message to send.' });
+            }
+            
             try {
-                const member = await interaction.guild.members.fetch(userId);
-                if (member && (!verifiedRole || member.roles.cache.has(verifiedRole.id))) {
-                    eligibleEntries.push(userId);
-                }
-            } catch (error) {}
-        }
-        
-        if (eligibleEntries.length === 0) {
-            return interaction.reply({ content: '❌ No eligible entries to reroll!', flags: 64 });
-        }
-        
-        const winner = eligibleEntries[Math.floor(Math.random() * eligibleEntries.length)];
-        
-        const rerollEmbed = new EmbedBuilder()
-            .setTitle('🎉 **GIVEAWAY REROLLED** 🎉')
-            .setDescription(`**Prize:** ${giveaway.items}\n**New Winner:** <@${winner}>`)
-            .setColor(0xff00ff)
-            .setThumbnail(LOGO_URL)
-            .addFields(
-                { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
-            )
-            .setTimestamp();
-        
-        const channel = interaction.guild.channels.cache.get(giveaway.channel_id);
-        if (channel) {
-            await channel.send({ embeds: [rerollEmbed] });
-        }
-        
-        await interaction.reply({ content: `✅ New winner selected: <@${winner}>`, flags: 64 });
-    }
-});
-
-// ============================================
-// MODAL HANDLER FOR /send (IMPROVED - Supports @mentions, #channels, new lines)
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId !== 'send_message_modal') return;
-    
-    const messageContent = interaction.fields.getTextInputValue('message_content');
-    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Please provide a message to send.', flags: 64 });
-    
-    // Send the message directly - Discord automatically parses @mentions and #channels
-    // No delay, no extra processing needed!
-    await interaction.channel.send(messageContent);
-    
-    // Reply to the user who sent the command (ephemeral, only they can see)
-    await interaction.reply({ content: '✅ Message sent successfully!', flags: 64 });
-});
-
-// ============================================
-// APPLICATION MODAL HANDLERS
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId !== 'staff_application_modal') return;
-    
-    const age = interaction.fields.getTextInputValue('staff_age');
-    const experience = interaction.fields.getTextInputValue('staff_experience');
-    const availability = interaction.fields.getTextInputValue('staff_availability');
-    const why = interaction.fields.getTextInputValue('staff_why');
-    const skills = interaction.fields.getTextInputValue('staff_skills');
-    
-    const applicationText = `**Age:** ${age}\n**Experience:** ${experience}\n**Availability:** ${availability}\n**Why Join:** ${why}\n**Skills:** ${skills}`;
-    
-    await interaction.reply({ content: '📝 Creating your staff application...', flags: 64 });
-    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.STAFF_APPLY_CATEGORY_ID, 'Staff Application', applicationText);
-    await interaction.editReply({ content: `✅ Staff application created: ${channel}`, flags: 64 });
-});
-
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId !== 'content_creator_modal') return;
-    
-    const platform = interaction.fields.getTextInputValue('creator_platform');
-    const link = interaction.fields.getTextInputValue('creator_link');
-    const followers = interaction.fields.getTextInputValue('creator_followers');
-    const content = interaction.fields.getTextInputValue('creator_content');
-    const why = interaction.fields.getTextInputValue('creator_why');
-    
-    const applicationText = `**Platform:** ${platform}\n**Channel Link:** ${link}\n**Followers/Subscribers:** ${followers}\n**Content Type:** ${content}\n**Why Partner:** ${why}`;
-    
-    await interaction.reply({ content: '🎬 Creating your content creator application...', flags: 64 });
-    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.CONTENT_CREATOR_CATEGORY_ID, 'Content Creator Application', applicationText);
-    await interaction.editReply({ content: `✅ Content creator application created: ${channel}`, flags: 64 });
-});
-
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId !== 'partner_modal') return;
-    
-    const serverName = interaction.fields.getTextInputValue('partner_server_name');
-    const serverLink = interaction.fields.getTextInputValue('partner_server_link');
-    const members = interaction.fields.getTextInputValue('partner_members');
-    const benefits = interaction.fields.getTextInputValue('partner_benefits');
-    const expectations = interaction.fields.getTextInputValue('partner_expectations');
-    
-    const applicationText = `**Server Name:** ${serverName}\n**Server Link:** ${serverLink}\n**Member Count:** ${members}\n**Benefits to HexMods:** ${benefits}\n**Expectations:** ${expectations}`;
-    
-    await interaction.reply({ content: '🤝 Creating your partner request...', flags: 64 });
-    const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.PARTNER_CATEGORY_ID, 'Partner Request', applicationText);
-    await interaction.editReply({ content: `✅ Partner request created: ${channel}`, flags: 64 });
-});
-
-// ============================================
-// GIVEAWAY ENTRY BUTTON HANDLER
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith('enter_giveaway_')) return;
-    
-    const giveawayId = parseInt(interaction.customId.replace('enter_giveaway_', ''));
-    if (isNaN(giveawayId)) return;
-    
-    const giveaway = await getGiveawayById(giveawayId);
-    if (!giveaway || !giveaway.is_active) {
-        return interaction.reply({ content: '❌ This giveaway has already ended!', flags: 64 });
-    }
-    
-    if (Date.now() >= giveaway.end_time) {
-        await endGiveaway(giveawayId, giveaway.message_id, giveaway.channel_id);
-        return interaction.reply({ content: '❌ This giveaway has ended!', flags: 64 });
-    }
-    
-    const hasEntered = await hasUserEnteredGiveaway(giveawayId, interaction.user.id);
-    if (hasEntered) {
-        return interaction.reply({ content: '❌ You have already entered this giveaway!', flags: 64 });
-    }
-    
-    const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
-    if (verifiedRole && !interaction.member.roles.cache.has(verifiedRole.id)) {
-        return interaction.reply({ content: '❌ You need to be verified to enter giveaways!', flags: 64 });
-    }
-    
-    await saveEntryToDB(giveawayId, interaction.user.id, Date.now());
-    
-    await interaction.reply({ content: '✅ You have entered the giveaway! Good luck!', flags: 64 });
-});
-
-// ============================================
-// CLAIM PRIZE BUTTON HANDLER (WITH TICKET)
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith('claim_prize_')) return;
-    
-    const giveawayId = parseInt(interaction.customId.replace('claim_prize_', ''));
-    if (isNaN(giveawayId)) return;
-    
-    const giveaway = await getGiveawayById(giveawayId);
-    if (!giveaway) {
-        return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
-    }
-    
-    const winnersList = giveaway.winners_list ? giveaway.winners_list.split(',') : [];
-    if (!winnersList.includes(interaction.user.id)) {
-        return interaction.reply({ content: '❌ You are not a winner of this giveaway!', flags: 64 });
-    }
-    
-    const allEntries = await getAllGiveawayEntries(giveawayId);
-    const userEntry = allEntries.find(entry => entry.user_id === interaction.user.id);
-    
-    if (userEntry && userEntry.has_claimed) {
-        return interaction.reply({ content: '❌ You have already claimed your prize!', flags: 64 });
-    }
-    
-    await markEntryAsClaimed(giveawayId, interaction.user.id);
-    
-    await interaction.reply({ content: '🎫 Creating your prize claim ticket...', flags: 64 });
-    
-    const ticketChannel = await createPrizeClaimTicket(interaction.user, interaction, giveaway);
-    
-    await interaction.editReply({ content: `✅ Your prize claim ticket has been created: ${ticketChannel}`, flags: 64 });
-});
-
-// ============================================
-// GIVEACCOUNT CATEGORY SELECTION HANDLER
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (!interaction.customId.startsWith('giveaccount_category_')) return;
-    
-    const parts = interaction.customId.split('_');
-    const userId = parts[2];
-    const channelId = parts[3];
-    const category = interaction.values[0];
-    
-    const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
-    const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
-    
-    const maxAmount = await getAccountCount(category);
-    if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!`, flags: 64 });
-    
-    const modal = new ModalBuilder()
-        .setCustomId(`giveaccount_amount_${userId}_${channelId}_${category}`)
-        .setTitle(`Give ${category} Account(s)`)
-        .addComponents(
-            new ActionRowBuilder().addComponents(
-                new TextInputBuilder()
-                    .setCustomId('amount')
-                    .setLabel(`Amount (1-${maxAmount})`)
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder(`How many accounts? (Max ${maxAmount})`)
-                    .setRequired(true)
-                    .setMaxLength(3)
-            )
-        );
-    
-    await interaction.showModal(modal);
-});
-
-// ============================================
-// GIVEACCOUNT AMOUNT MODAL HANDLER
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-    if (!interaction.customId.startsWith('giveaccount_amount_')) return;
-    
-    const parts = interaction.customId.split('_');
-    const userId = parts[2];
-    const channelId = parts[3];
-    const category = parts[4];
-    
-    const amount = parseInt(interaction.fields.getTextInputValue('amount'));
-    const maxAmount = await getAccountCount(category);
-    
-    const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
-    const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
-    if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})`, flags: 64 });
-    
-    const removedAccounts = await removeRandomAccounts(category, amount);
-    if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', flags: 64 });
-    
-    const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
-    const accountsText = removedAccounts.map((a, i) => `${i + 1}. ${a.content}`).join('\n');
-    
-    const accountEmbed = new EmbedBuilder()
-        .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s) Given**`)
-        .setDescription(accountsText)
-        .setColor(0x00ff00)
-        .setThumbnail(LOGO_URL)
-        .addFields(
-            { name: '👤 Given to', value: targetUser.user.tag, inline: true },
-            { name: '📦 Amount', value: `${removedAccounts.length} account(s)`, inline: true },
-            { name: '📅 Given at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-        )
-        .setFooter({ text: `Given by ${interaction.user.tag}` })
-        .setTimestamp();
-    
-    await targetChannel.send({ embeds: [accountEmbed] });
-    
-    await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, flags: 64 });
-    
-    await updateStorageDisplayForType(category);
-});
-
-// ============================================
-// PURCHASE SELECT MENU HANDLER
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (!interaction.customId.startsWith('purchase_select_')) return;
-    
-    const parts = interaction.customId.split('_');
-    const buyerId = parts[2];
-    const channelId = parts[3];
-    
-    const buyer = await interaction.guild.members.fetch(buyerId).catch(() => null);
-    const targetChannel = interaction.guild.channels.cache.get(channelId);
-    if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!', flags: 64 });
-    
-    const productName = interaction.values[0];
-    const purchases = await getAllPurchasesFromDB();
-    const purchase = purchases.get(productName);
-    if (!purchase) return interaction.reply({ content: '❌ Product not found!', flags: 64 });
-    
-    const productEmbed = new EmbedBuilder()
-        .setTitle(`🛍️ **${purchase.originalName}**`)
-        .setDescription(purchase.content)
-        .setColor(0x00ff00)
-        .setThumbnail(LOGO_URL)
-        .addFields(
-            { name: '👤 Purchased by', value: buyer.user.tag, inline: true },
-            { name: '🛒 Product', value: purchase.originalName, inline: true },
-            { name: '📅 Purchased at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-        )
-        .setFooter({ text: `Purchase completed by ${interaction.user.tag}` })
-        .setTimestamp();
-    
-    await targetChannel.send({ embeds: [productEmbed] });
-    await interaction.reply({ content: `✅ **${purchase.originalName}** sent!`, flags: 64 });
-});
-
-// ============================================
-// BUTTON HANDLERS (Storage, Roles, Tickets, etc.)
-// ============================================
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-    
-    if (interaction.customId.startsWith('enter_giveaway_') || interaction.customId.startsWith('claim_prize_')) return;
-    
-    // Refresh storage buttons
-    if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
-        const type = interaction.customId.replace('refresh_', '');
-        
-        const now = Date.now();
-        if (lastStorageUpdate[type] && (now - lastStorageUpdate[type]) < STORAGE_COOLDOWN) {
-            const remainingSeconds = Math.ceil((STORAGE_COOLDOWN - (now - lastStorageUpdate[type])) / 1000);
-            await interaction.reply({ 
-                content: `⏳ Please wait ${remainingSeconds} seconds before refreshing again!`, 
-                flags: 64 
-            });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                await interaction.channel.send(messageContent);
+                await interaction.editReply({ content: '✅ Message sent successfully!' });
+            } catch (error) {
+                console.error('Error sending message:', error);
+                await interaction.editReply({ content: '❌ Failed to send message. Please try again.' });
+            }
             return;
         }
         
-        lastStorageUpdate[type] = now;
-        await updateStorageDisplayForType(type);
-        await interaction.reply({ content: `🔄 ${type} storage refreshed!`, flags: 64 });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
-        return;
-    }
-    
-    // Export storage buttons
-    if (interaction.customId === 'export_discord' || interaction.customId === 'export_steam' || interaction.customId === 'export_fivem') {
-        const type = interaction.customId.replace('export_', '');
-        const accounts = await getAllAccountsByType(type);
-        let exportText = `=== ${type.toUpperCase()} ACCOUNTS EXPORT ===\nExported at: ${new Date().toLocaleString()}\nTotal: ${accounts.length}\n\n`;
-        accounts.forEach((a, index) => {
-            exportText += `${index + 1}. ${a.content}\nAdded by: ${a.added_by}\nAdded at: ${new Date(a.added_at).toLocaleString()}\n---\n`;
-        });
-        const buffer = Buffer.from(exportText, 'utf-8');
-        await interaction.reply({
-            content: `📋 ${type} accounts export complete!`,
-            files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }],
-            flags: 64
-        });
-        return;
-    }
-    
-    // Role claim buttons
-    const roleMap = {
-        'claim_spoof': CONFIG.SPOOF_ACCOUNTS_ROLE_ID,
-        'claim_trigger': CONFIG.TRIGGER_SHOP_ROLE_ID,
-        'claim_scripts': CONFIG.SCRIPTS_ROLE_ID,
-        'claim_cheats': CONFIG.CHEATS_SOFTWARE_ROLE_ID,
-        'claim_irl': CONFIG.IRL_TRADING_ROLE_ID
-    };
-    
-    if (roleMap[interaction.customId]) {
-        const role = interaction.guild.roles.cache.get(roleMap[interaction.customId]);
-        if (!role) return interaction.reply({ content: '❌ Role not configured!', flags: 64 });
-        
-        if (interaction.member.roles.cache.has(role.id)) {
-            await interaction.member.roles.remove(role);
-            await interaction.reply({ content: `✅ Removed **${role.name}**`, flags: 64 });
-        } else {
-            await interaction.member.roles.add(role);
-            await interaction.reply({ content: `✅ Added **${role.name}**`, flags: 64 });
+        // Handle other modals
+        if (interaction.customId === 'staff_application_modal') {
+            const age = interaction.fields.getTextInputValue('staff_age');
+            const experience = interaction.fields.getTextInputValue('staff_experience');
+            const availability = interaction.fields.getTextInputValue('staff_availability');
+            const why = interaction.fields.getTextInputValue('staff_why');
+            const skills = interaction.fields.getTextInputValue('staff_skills');
+            
+            const applicationText = `**Age:** ${age}\n**Experience:** ${experience}\n**Availability:** ${availability}\n**Why Join:** ${why}\n**Skills:** ${skills}`;
+            
+            await interaction.reply({ content: '📝 Creating your staff application...', flags: 64 });
+            const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.STAFF_APPLY_CATEGORY_ID, 'Staff Application', applicationText);
+            await interaction.editReply({ content: `✅ Staff application created: ${channel}`, flags: 64 });
+            return;
         }
-        return;
-    }
-    
-    if (interaction.customId === 'claim_all') {
-        const roles = [CONFIG.SPOOF_ACCOUNTS_ROLE_ID, CONFIG.TRIGGER_SHOP_ROLE_ID, CONFIG.SCRIPTS_ROLE_ID, CONFIG.CHEATS_SOFTWARE_ROLE_ID, CONFIG.IRL_TRADING_ROLE_ID];
-        let added = 0;
-        for (const id of roles) {
-            const role = interaction.guild.roles.cache.get(id);
-            if (role && !interaction.member.roles.cache.has(role.id)) {
-                await interaction.member.roles.add(role);
-                added++;
-            }
+        
+        if (interaction.customId === 'content_creator_modal') {
+            const platform = interaction.fields.getTextInputValue('creator_platform');
+            const link = interaction.fields.getTextInputValue('creator_link');
+            const followers = interaction.fields.getTextInputValue('creator_followers');
+            const content = interaction.fields.getTextInputValue('creator_content');
+            const why = interaction.fields.getTextInputValue('creator_why');
+            
+            const applicationText = `**Platform:** ${platform}\n**Channel Link:** ${link}\n**Followers/Subscribers:** ${followers}\n**Content Type:** ${content}\n**Why Partner:** ${why}`;
+            
+            await interaction.reply({ content: '🎬 Creating your content creator application...', flags: 64 });
+            const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.CONTENT_CREATOR_CATEGORY_ID, 'Content Creator Application', applicationText);
+            await interaction.editReply({ content: `✅ Content creator application created: ${channel}`, flags: 64 });
+            return;
         }
-        await interaction.reply({ content: `✅ Added ${added} role(s)!`, flags: 64 });
-        return;
-    }
-    
-    if (interaction.customId === 'unclaim_all') {
-        const roles = [CONFIG.SPOOF_ACCOUNTS_ROLE_ID, CONFIG.TRIGGER_SHOP_ROLE_ID, CONFIG.SCRIPTS_ROLE_ID, CONFIG.CHEATS_SOFTWARE_ROLE_ID, CONFIG.IRL_TRADING_ROLE_ID];
-        let removed = 0;
-        for (const id of roles) {
-            const role = interaction.guild.roles.cache.get(id);
-            if (role && interaction.member.roles.cache.has(role.id)) {
-                await interaction.member.roles.remove(role);
-                removed++;
-            }
+        
+        if (interaction.customId === 'partner_modal') {
+            const serverName = interaction.fields.getTextInputValue('partner_server_name');
+            const serverLink = interaction.fields.getTextInputValue('partner_server_link');
+            const members = interaction.fields.getTextInputValue('partner_members');
+            const benefits = interaction.fields.getTextInputValue('partner_benefits');
+            const expectations = interaction.fields.getTextInputValue('partner_expectations');
+            
+            const applicationText = `**Server Name:** ${serverName}\n**Server Link:** ${serverLink}\n**Member Count:** ${members}\n**Benefits to HexMods:** ${benefits}\n**Expectations:** ${expectations}`;
+            
+            await interaction.reply({ content: '🤝 Creating your partner request...', flags: 64 });
+            const channel = await createApplicationTicket(interaction.user, interaction, CONFIG.PARTNER_CATEGORY_ID, 'Partner Request', applicationText);
+            await interaction.editReply({ content: `✅ Partner request created: ${channel}`, flags: 64 });
+            return;
         }
-        await interaction.reply({ content: `✅ Removed ${removed} role(s)!`, flags: 64 });
-        return;
-    }
-    
-    // Buy product button
-    if (interaction.customId.startsWith('buy_')) {
-        const product = client.products?.get(interaction.customId);
-        const name = product?.name || 'Unknown';
-        const price = product?.price || 'Unknown';
         
-        let hasTicket = false;
-        for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) {
-                hasTicket = true;
-                break;
-            }
-        }
-        if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!`, flags: 64 });
-        
-        await interaction.reply({ content: `🛒 Creating ticket for ${name}...`, flags: 64 });
-        const channel = await createPurchaseTicket(interaction.user, interaction, name, price);
-        await interaction.editReply({ content: `✅ Ticket created: ${channel}`, flags: 64 });
-        client.products?.delete(interaction.customId);
-        return;
-    }
-    
-    if (interaction.customId === 'more_info') {
-        const embed = new EmbedBuilder()
-            .setTitle('❓ Product Info')
-            .setDescription('Click **Buy Now** to create a ticket!')
-            .setColor(0x0099ff)
-            .setThumbnail(LOGO_URL)
-            .setTimestamp();
-        await interaction.reply({ embeds: [embed], flags: 64 });
-        return;
-    }
-    
-    // VERIFICATION BUTTON
-    if (interaction.customId === 'verify_button') {
-        const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
-        const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
-        if (!verified) return interaction.reply({ content: '❌ Role not set!', flags: 64 });
-        if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!', flags: 64 });
-        
-        await interaction.member.roles.add(verified);
-        if (unverified) await interaction.member.roles.remove(unverified);
-        
-        const embed = new EmbedBuilder()
-            .setTitle('✅ **Verification Successful!**')
-            .setDescription(`Welcome ${interaction.user}! You now have access to all channels.`)
-            .setColor(0x00ff00)
-            .setThumbnail(LOGO_URL)
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed], flags: 64 });
-        
-        const logChannel = interaction.guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
-        if (logChannel) {
-            const logEmbed = new EmbedBuilder()
-                .setTitle('✅ User Verified')
-                .setDescription(`**User:** ${interaction.user.tag} (${interaction.user.id})\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+        // Handle giveaccount amount modal
+        if (interaction.customId.startsWith('giveaccount_amount_')) {
+            const parts = interaction.customId.split('_');
+            const userId = parts[2];
+            const channelId = parts[3];
+            const category = parts[4];
+            
+            const amount = parseInt(interaction.fields.getTextInputValue('amount'));
+            const maxAmount = await getAccountCount(category);
+            
+            const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
+            const targetChannel = interaction.guild.channels.cache.get(channelId);
+            if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
+            if (isNaN(amount) || amount < 1 || amount > maxAmount) return interaction.reply({ content: `❌ Invalid amount! (1-${maxAmount})`, flags: 64 });
+            
+            const removedAccounts = await removeRandomAccounts(category, amount);
+            if (removedAccounts.length === 0) return interaction.reply({ content: '❌ Failed to give accounts.', flags: 64 });
+            
+            const typeEmoji = category === 'steam' ? '🎮' : (category === 'fivem' ? '🚗' : '💬');
+            const accountsText = removedAccounts.map((a, i) => `${i + 1}. ${a.content}`).join('\n');
+            
+            const accountEmbed = new EmbedBuilder()
+                .setTitle(`${typeEmoji} **${removedAccounts.length} ${category.toUpperCase()} Account(s) Given**`)
+                .setDescription(accountsText)
                 .setColor(0x00ff00)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '👤 Given to', value: targetUser.user.tag, inline: true },
+                    { name: '📦 Amount', value: `${removedAccounts.length} account(s)`, inline: true },
+                    { name: '📅 Given at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+                )
+                .setFooter({ text: `Given by ${interaction.user.tag}` })
                 .setTimestamp();
-            await logChannel.send({ embeds: [logEmbed] });
+            
+            await targetChannel.send({ embeds: [accountEmbed] });
+            await interaction.reply({ content: `✅ **${removedAccounts.length} account(s)** given to ${targetUser.user.tag}!`, flags: 64 });
+            await updateStorageDisplayForType(category);
+            return;
         }
         
-        console.log(`✅ Verified ${interaction.user.tag}`);
         return;
     }
     
-    // Support ticket category selection
-    let catId = null, type = null;
-    if (interaction.customId === 'general_ticket') { catId = CONFIG.GENERAL_CATEGORY_ID; type = 'General Question'; }
-    else if (interaction.customId === 'purchase_ticket') { catId = CONFIG.PURCHASE_CATEGORY_ID; type = 'Purchase'; }
-    else if (interaction.customId === 'buysupport_ticket') { catId = CONFIG.BUY_SUPPORT_CATEGORY_ID; type = 'Buy Support'; }
-    
-    if (catId && type) {
-        for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!`, flags: 64 });
+    // Handle BUTTONS
+    if (interaction.isButton()) {
+        // Giveaway entry buttons
+        if (interaction.customId.startsWith('enter_giveaway_')) {
+            const giveawayId = parseInt(interaction.customId.replace('enter_giveaway_', ''));
+            if (isNaN(giveawayId)) return;
+            
+            const giveaway = await getGiveawayById(giveawayId);
+            if (!giveaway || !giveaway.is_active) {
+                return interaction.reply({ content: '❌ This giveaway has already ended!', flags: 64 });
+            }
+            
+            if (Date.now() >= giveaway.end_time) {
+                await endGiveaway(giveawayId, giveaway.message_id, giveaway.channel_id);
+                return interaction.reply({ content: '❌ This giveaway has ended!', flags: 64 });
+            }
+            
+            const hasEntered = await hasUserEnteredGiveaway(giveawayId, interaction.user.id);
+            if (hasEntered) {
+                return interaction.reply({ content: '❌ You have already entered this giveaway!', flags: 64 });
+            }
+            
+            const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
+            if (verifiedRole && !interaction.member.roles.cache.has(verifiedRole.id)) {
+                return interaction.reply({ content: '❌ You need to be verified to enter giveaways!', flags: 64 });
+            }
+            
+            await saveEntryToDB(giveawayId, interaction.user.id, Date.now());
+            await interaction.reply({ content: '✅ You have entered the giveaway! Good luck!', flags: 64 });
+            return;
         }
-        await interaction.reply({ content: `🎫 Creating ${type} ticket...`, flags: 64 });
-        const channel = await createTicket(interaction.user, interaction, catId, type);
-        await interaction.editReply({ content: `✅ Ticket created: ${channel}`, flags: 64 });
-        return;
-    }
-    
-    // Application buttons
-    if (interaction.customId === 'apply_staff') {
-        for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        
+        // Claim prize buttons
+        if (interaction.customId.startsWith('claim_prize_')) {
+            const giveawayId = parseInt(interaction.customId.replace('claim_prize_', ''));
+            if (isNaN(giveawayId)) return;
+            
+            const giveaway = await getGiveawayById(giveawayId);
+            if (!giveaway) {
+                return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
+            }
+            
+            const winnersList = giveaway.winners_list ? giveaway.winners_list.split(',') : [];
+            if (!winnersList.includes(interaction.user.id)) {
+                return interaction.reply({ content: '❌ You are not a winner of this giveaway!', flags: 64 });
+            }
+            
+            const allEntries = await getAllGiveawayEntries(giveawayId);
+            const userEntry = allEntries.find(entry => entry.user_id === interaction.user.id);
+            
+            if (userEntry && userEntry.has_claimed) {
+                return interaction.reply({ content: '❌ You have already claimed your prize!', flags: 64 });
+            }
+            
+            await markEntryAsClaimed(giveawayId, interaction.user.id);
+            await interaction.reply({ content: '🎫 Creating your prize claim ticket...', flags: 64 });
+            const ticketChannel = await createPrizeClaimTicket(interaction.user, interaction, giveaway);
+            await interaction.editReply({ content: `✅ Your prize claim ticket has been created: ${ticketChannel}`, flags: 64 });
+            return;
         }
-        await showStaffApplicationModal(interaction);
-        return;
-    }
-    
-    if (interaction.customId === 'apply_content_creator') {
-        for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        
+        // Refresh storage buttons
+        if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
+            const type = interaction.customId.replace('refresh_', '');
+            const now = Date.now();
+            if (lastStorageUpdate[type] && (now - lastStorageUpdate[type]) < STORAGE_COOLDOWN) {
+                const remainingSeconds = Math.ceil((STORAGE_COOLDOWN - (now - lastStorageUpdate[type])) / 1000);
+                await interaction.reply({ content: `⏳ Please wait ${remainingSeconds} seconds before refreshing again!`, flags: 64 });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+            lastStorageUpdate[type] = now;
+            await updateStorageDisplayForType(type);
+            await interaction.reply({ content: `🔄 ${type} storage refreshed!`, flags: 64 });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
+            return;
         }
-        await showContentCreatorModal(interaction);
-        return;
-    }
-    
-    if (interaction.customId === 'apply_partner') {
-        for (const [, data] of tickets) {
-            if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+        
+        // Export storage buttons
+        if (interaction.customId === 'export_discord' || interaction.customId === 'export_steam' || interaction.customId === 'export_fivem') {
+            const type = interaction.customId.replace('export_', '');
+            const accounts = await getAllAccountsByType(type);
+            let exportText = `=== ${type.toUpperCase()} ACCOUNTS EXPORT ===\nExported at: ${new Date().toLocaleString()}\nTotal: ${accounts.length}\n\n`;
+            accounts.forEach((a, index) => {
+                exportText += `${index + 1}. ${a.content}\nAdded by: ${a.added_by}\nAdded at: ${new Date(a.added_at).toLocaleString()}\n---\n`;
+            });
+            const buffer = Buffer.from(exportText, 'utf-8');
+            await interaction.reply({
+                content: `📋 ${type} accounts export complete!`,
+                files: [{ attachment: buffer, name: `${type}_export_${Date.now()}.txt` }],
+                flags: 64
+            });
+            return;
         }
-        await showPartnerModal(interaction);
-        return;
-    }
-    
-    // TICKET MANAGEMENT BUTTONS
-    let ticketData = tickets.get(interaction.channelId);
-    
-    if (!ticketData) {
-        const dbTicket = await getTicketFromDB(interaction.channelId);
-        if (dbTicket) {
-            ticketData = dbTicket;
+        
+        // Role claim buttons
+        const roleMap = {
+            'claim_spoof': CONFIG.SPOOF_ACCOUNTS_ROLE_ID,
+            'claim_trigger': CONFIG.TRIGGER_SHOP_ROLE_ID,
+            'claim_scripts': CONFIG.SCRIPTS_ROLE_ID,
+            'claim_cheats': CONFIG.CHEATS_SOFTWARE_ROLE_ID,
+            'claim_irl': CONFIG.IRL_TRADING_ROLE_ID
+        };
+        
+        if (roleMap[interaction.customId]) {
+            const role = interaction.guild.roles.cache.get(roleMap[interaction.customId]);
+            if (!role) return interaction.reply({ content: '❌ Role not configured!', flags: 64 });
+            
+            if (interaction.member.roles.cache.has(role.id)) {
+                await interaction.member.roles.remove(role);
+                await interaction.reply({ content: `✅ Removed **${role.name}**`, flags: 64 });
+            } else {
+                await interaction.member.roles.add(role);
+                await interaction.reply({ content: `✅ Added **${role.name}**`, flags: 64 });
+            }
+            return;
+        }
+        
+        if (interaction.customId === 'claim_all') {
+            const roles = [CONFIG.SPOOF_ACCOUNTS_ROLE_ID, CONFIG.TRIGGER_SHOP_ROLE_ID, CONFIG.SCRIPTS_ROLE_ID, CONFIG.CHEATS_SOFTWARE_ROLE_ID, CONFIG.IRL_TRADING_ROLE_ID];
+            let added = 0;
+            for (const id of roles) {
+                const role = interaction.guild.roles.cache.get(id);
+                if (role && !interaction.member.roles.cache.has(role.id)) {
+                    await interaction.member.roles.add(role);
+                    added++;
+                }
+            }
+            await interaction.reply({ content: `✅ Added ${added} role(s)!`, flags: 64 });
+            return;
+        }
+        
+        if (interaction.customId === 'unclaim_all') {
+            const roles = [CONFIG.SPOOF_ACCOUNTS_ROLE_ID, CONFIG.TRIGGER_SHOP_ROLE_ID, CONFIG.SCRIPTS_ROLE_ID, CONFIG.CHEATS_SOFTWARE_ROLE_ID, CONFIG.IRL_TRADING_ROLE_ID];
+            let removed = 0;
+            for (const id of roles) {
+                const role = interaction.guild.roles.cache.get(id);
+                if (role && interaction.member.roles.cache.has(role.id)) {
+                    await interaction.member.roles.remove(role);
+                    removed++;
+                }
+            }
+            await interaction.reply({ content: `✅ Removed ${removed} role(s)!`, flags: 64 });
+            return;
+        }
+        
+        // Buy product button
+        if (interaction.customId.startsWith('buy_')) {
+            const product = client.products?.get(interaction.customId);
+            const name = product?.name || 'Unknown';
+            const price = product?.price || 'Unknown';
+            
+            let hasTicket = false;
+            for (const [, data] of tickets) {
+                if (data.userId === interaction.user.id) {
+                    hasTicket = true;
+                    break;
+                }
+            }
+            if (hasTicket) return interaction.reply({ content: `❌ You already have an open ticket!`, flags: 64 });
+            
+            await interaction.reply({ content: `🛒 Creating ticket for ${name}...`, flags: 64 });
+            const channel = await createPurchaseTicket(interaction.user, interaction, name, price);
+            await interaction.editReply({ content: `✅ Ticket created: ${channel}`, flags: 64 });
+            client.products?.delete(interaction.customId);
+            return;
+        }
+        
+        if (interaction.customId === 'more_info') {
+            const embed = new EmbedBuilder()
+                .setTitle('❓ Product Info')
+                .setDescription('Click **Buy Now** to create a ticket!')
+                .setColor(0x0099ff)
+                .setThumbnail(LOGO_URL)
+                .setTimestamp();
+            await interaction.reply({ embeds: [embed], flags: 64 });
+            return;
+        }
+        
+        // Verification button
+        if (interaction.customId === 'verify_button') {
+            const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
+            const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
+            if (!verified) return interaction.reply({ content: '❌ Role not set!', flags: 64 });
+            if (interaction.member.roles.cache.has(verified.id)) return interaction.reply({ content: '✅ Already verified!', flags: 64 });
+            
+            await interaction.member.roles.add(verified);
+            if (unverified) await interaction.member.roles.remove(unverified);
+            
+            const embed = new EmbedBuilder()
+                .setTitle('✅ **Verification Successful!**')
+                .setDescription(`Welcome ${interaction.user}! You now have access to all channels.`)
+                .setColor(0x00ff00)
+                .setThumbnail(LOGO_URL)
+                .setTimestamp();
+            
+            await interaction.reply({ embeds: [embed], flags: 64 });
+            
+            const logChannel = interaction.guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setTitle('✅ User Verified')
+                    .setDescription(`**User:** ${interaction.user.tag} (${interaction.user.id})\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+                    .setColor(0x00ff00)
+                    .setTimestamp();
+                await logChannel.send({ embeds: [logEmbed] });
+            }
+            return;
+        }
+        
+        // Support ticket category selection
+        let catId = null, type = null;
+        if (interaction.customId === 'general_ticket') { catId = CONFIG.GENERAL_CATEGORY_ID; type = 'General Question'; }
+        else if (interaction.customId === 'purchase_ticket') { catId = CONFIG.PURCHASE_CATEGORY_ID; type = 'Purchase'; }
+        else if (interaction.customId === 'buysupport_ticket') { catId = CONFIG.BUY_SUPPORT_CATEGORY_ID; type = 'Buy Support'; }
+        
+        if (catId && type) {
+            for (const [, data] of tickets) {
+                if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have a ticket!`, flags: 64 });
+            }
+            await interaction.reply({ content: `🎫 Creating ${type} ticket...`, flags: 64 });
+            const channel = await createTicket(interaction.user, interaction, catId, type);
+            await interaction.editReply({ content: `✅ Ticket created: ${channel}`, flags: 64 });
+            return;
+        }
+        
+        // Application buttons
+        if (interaction.customId === 'apply_staff') {
+            for (const [, data] of tickets) {
+                if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+            }
+            await showStaffApplicationModal(interaction);
+            return;
+        }
+        
+        if (interaction.customId === 'apply_content_creator') {
+            for (const [, data] of tickets) {
+                if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+            }
+            await showContentCreatorModal(interaction);
+            return;
+        }
+        
+        if (interaction.customId === 'apply_partner') {
+            for (const [, data] of tickets) {
+                if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
+            }
+            await showPartnerModal(interaction);
+            return;
+        }
+        
+        // Ticket management buttons
+        let ticketData = tickets.get(interaction.channelId);
+        
+        if (!ticketData) {
+            const dbTicket = await getTicketFromDB(interaction.channelId);
+            if (dbTicket) {
+                ticketData = dbTicket;
+                tickets.set(interaction.channelId, ticketData);
+            }
+        }
+        
+        if (!ticketData) {
+            return interaction.reply({ content: '❌ Ticket not found! Please contact an admin.', flags: 64 });
+        }
+        
+        // Claim ticket
+        if (interaction.customId === 'claim_ticket') {
+            if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to claim tickets!', flags: 64 });
+            }
+            if (ticketData.claimedBy) {
+                return interaction.reply({ content: '❌ This ticket has already been claimed!', flags: 64 });
+            }
+            
+            ticketData.claimedBy = interaction.user.id;
             tickets.set(interaction.channelId, ticketData);
-        }
-    }
-    
-    if (!ticketData) {
-        console.log(`⚠️ No ticket data found for ${interaction.channelId}`);
-        return interaction.reply({ content: '❌ Ticket not found! Please contact an admin.', flags: 64 });
-    }
-    
-    // CLAIM TICKET
-    if (interaction.customId === 'claim_ticket') {
-        if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) {
-            return interaction.reply({ content: '❌ You do not have permission to claim tickets!', flags: 64 });
-        }
-        if (ticketData.claimedBy) {
-            return interaction.reply({ content: '❌ This ticket has already been claimed!', flags: 64 });
-        }
-        
-        ticketData.claimedBy = interaction.user.id;
-        tickets.set(interaction.channelId, ticketData);
-        await claimTicketInDB(interaction.channelId, interaction.user.id);
-        
-        const embed = new EmbedBuilder()
-            .setTitle('🎯 Ticket Claimed')
-            .setDescription(`${interaction.user.toString()} has claimed this ticket and will assist you.`)
-            .setColor(0xffaa00)
-            .addFields(
-                { name: 'Claimed by', value: interaction.user.tag, inline: true },
-                { name: 'Ticket Type', value: ticketData.type, inline: true }
-            )
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
-        
-        const user = await interaction.guild.members.fetch(ticketData.userId).catch(() => null);
-        if (user) {
-            user.send(`✅ Your ticket has been claimed by ${interaction.user.tag}!`).catch(() => {});
-        }
-        return;
-    }
-    
-    // CLOSE TICKET
-    if (interaction.customId === 'close_ticket') {
-        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
-        if (!hasPerm) {
-            return interaction.reply({ content: '❌ You do not have permission to close this ticket!', flags: 64 });
+            await claimTicketInDB(interaction.channelId, interaction.user.id);
+            
+            const embed = new EmbedBuilder()
+                .setTitle('🎯 Ticket Claimed')
+                .setDescription(`${interaction.user.toString()} has claimed this ticket and will assist you.`)
+                .setColor(0xffaa00)
+                .addFields(
+                    { name: 'Claimed by', value: interaction.user.tag, inline: true },
+                    { name: 'Ticket Type', value: ticketData.type, inline: true }
+                )
+                .setTimestamp();
+            
+            await interaction.reply({ embeds: [embed] });
+            
+            const user = await interaction.guild.members.fetch(ticketData.userId).catch(() => null);
+            if (user) {
+                user.send(`✅ Your ticket has been claimed by ${interaction.user.tag}!`).catch(() => {});
+            }
+            return;
         }
         
-        await closeTicketInDB(interaction.channelId);
+        // Close ticket
+        if (interaction.customId === 'close_ticket') {
+            const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
+            if (!hasPerm) {
+                return interaction.reply({ content: '❌ You do not have permission to close this ticket!', flags: 64 });
+            }
+            
+            await closeTicketInDB(interaction.channelId);
+            
+            const closeEmbed = new EmbedBuilder()
+                .setTitle('🔒 Closing Ticket')
+                .setDescription(`This ticket will be deleted in **5 seconds**. A transcript will be saved.`)
+                .setColor(0xff0000)
+                .setTimestamp();
+            
+            await interaction.reply({ embeds: [closeEmbed] });
+            
+            setTimeout(async () => {
+                await sendTranscript(interaction.channel, interaction);
+                await interaction.channel.delete();
+                tickets.delete(interaction.channelId);
+                await updateTicketCountVoiceChannel();
+            }, 5000);
+            return;
+        }
         
-        const closeEmbed = new EmbedBuilder()
-            .setTitle('🔒 Closing Ticket')
-            .setDescription(`This ticket will be deleted in **5 seconds**. A transcript will be saved.`)
-            .setColor(0xff0000)
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [closeEmbed] });
-        
-        setTimeout(async () => {
+        // Get transcript
+        if (interaction.customId === 'transcript') {
+            const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
+            if (!hasPerm) {
+                return interaction.reply({ content: '❌ You do not have permission to get transcript!', flags: 64 });
+            }
+            
+            await interaction.reply({ content: '📄 Generating transcript...', flags: 64 });
             await sendTranscript(interaction.channel, interaction);
-            await interaction.channel.delete();
-            tickets.delete(interaction.channelId);
-            await updateTicketCountVoiceChannel();
-            console.log(`🗑️ Ticket closed. Remaining tickets: ${tickets.size}`);
-        }, 5000);
+            await interaction.editReply({ content: '✅ Transcript has been sent to the transcript channel!', flags: 64 });
+            return;
+        }
+        
         return;
     }
     
-    // GET TRANSCRIPT
-    if (interaction.customId === 'transcript') {
-        const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
-        if (!hasPerm) {
-            return interaction.reply({ content: '❌ You do not have permission to get transcript!', flags: 64 });
+    // Handle STRING SELECT MENUS
+    if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('giveaccount_category_')) {
+            const parts = interaction.customId.split('_');
+            const userId = parts[2];
+            const channelId = parts[3];
+            const category = interaction.values[0];
+            
+            const targetUser = await interaction.guild.members.fetch(userId).catch(() => null);
+            const targetChannel = interaction.guild.channels.cache.get(channelId);
+            if (!targetUser || !targetChannel) return interaction.reply({ content: '❌ User or channel not found!', flags: 64 });
+            
+            const maxAmount = await getAccountCount(category);
+            if (maxAmount === 0) return interaction.reply({ content: `❌ No ${category} accounts available!`, flags: 64 });
+            
+            const modal = new ModalBuilder()
+                .setCustomId(`giveaccount_amount_${userId}_${channelId}_${category}`)
+                .setTitle(`Give ${category} Account(s)`)
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('amount')
+                            .setLabel(`Amount (1-${maxAmount})`)
+                            .setStyle(TextInputStyle.Short)
+                            .setPlaceholder(`How many accounts? (Max ${maxAmount})`)
+                            .setRequired(true)
+                            .setMaxLength(3)
+                    )
+                );
+            
+            await interaction.showModal(modal);
+            return;
         }
         
-        await interaction.reply({ content: '📄 Generating transcript...', flags: 64 });
-        await sendTranscript(interaction.channel, interaction);
-        await interaction.editReply({ content: '✅ Transcript has been sent to the transcript channel!', flags: 64 });
+        if (interaction.customId.startsWith('purchase_select_')) {
+            const parts = interaction.customId.split('_');
+            const buyerId = parts[2];
+            const channelId = parts[3];
+            
+            const buyer = await interaction.guild.members.fetch(buyerId).catch(() => null);
+            const targetChannel = interaction.guild.channels.cache.get(channelId);
+            if (!buyer || !targetChannel) return interaction.reply({ content: '❌ Buyer or channel not found!', flags: 64 });
+            
+            const productName = interaction.values[0];
+            const purchases = await getAllPurchasesFromDB();
+            const purchase = purchases.get(productName);
+            if (!purchase) return interaction.reply({ content: '❌ Product not found!', flags: 64 });
+            
+            const productEmbed = new EmbedBuilder()
+                .setTitle(`🛍️ **${purchase.originalName}**`)
+                .setDescription(purchase.content)
+                .setColor(0x00ff00)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '👤 Purchased by', value: buyer.user.tag, inline: true },
+                    { name: '🛒 Product', value: purchase.originalName, inline: true },
+                    { name: '📅 Purchased at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+                )
+                .setFooter({ text: `Purchase completed by ${interaction.user.tag}` })
+                .setTimestamp();
+            
+            await targetChannel.send({ embeds: [productEmbed] });
+            await interaction.reply({ content: `✅ **${purchase.originalName}** sent!`, flags: 64 });
+            return;
+        }
+        
+        return;
+    }
+    
+    // Handle SLASH COMMANDS
+    if (interaction.isChatInputCommand()) {
+        // /send command
+        if (interaction.commandName === 'send') {
+            if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
+            }
+            
+            const modal = new ModalBuilder()
+                .setCustomId('send_message_modal')
+                .setTitle('Send Message as Bot')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('message_content')
+                            .setLabel('Message Content')
+                            .setStyle(TextInputStyle.Paragraph)
+                            .setPlaceholder('Type your message here...\n\nYou can use:\n• @username to tag people\n• #channel to tag channels\n• Shift+Enter for new line\n• @everyone or @here')
+                            .setRequired(true)
+                            .setMaxLength(4000)
+                    )
+                );
+            
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        // /product command
+        if (interaction.commandName === 'product') {
+            if (!interaction.member.roles.cache.has(CONFIG.PRODUCT_ROLE_ID)) {
+                return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            }
+            const name = interaction.options.getString('name');
+            const inStock = interaction.options.getString('instock') === 'yes';
+            const price = interaction.options.getString('price');
+            const desc = interaction.options.getString('description') || 'No description';
+            const img = interaction.options.getString('image');
+            
+            const embed = new EmbedBuilder()
+                .setTitle(name)
+                .setDescription(desc)
+                .setColor(inStock ? 0x00ff00 : 0xff0000)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '💰 Price', value: price, inline: true },
+                    { name: '📦 Stock', value: inStock ? '✅ IN STOCK' : '❌ OUT OF STOCK', inline: true },
+                    { name: '📅 Listed', value: new Date().toLocaleDateString(), inline: true }
+                )
+                .setTimestamp();
+            if (img?.startsWith('http')) embed.setImage(img);
+            
+            const btnId = `buy_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(btnId).setLabel('Buy Now').setStyle(ButtonStyle.Success).setEmoji('🛒'),
+                new ButtonBuilder().setCustomId('more_info').setLabel('More Info').setStyle(ButtonStyle.Primary).setEmoji('❓')
+            );
+            
+            if (!client.products) client.products = new Map();
+            client.products.set(btnId, { name, price });
+            
+            await interaction.channel.send({ embeds: [embed], components: [row] });
+            await interaction.reply({ content: '✅ Product posted!', flags: 64 });
+            return;
+        }
+        
+        // /clear command
+        if (interaction.commandName === 'clear') {
+            if (!interaction.member.roles.cache.has(CONFIG.CLEAR_ROLE_ID)) {
+                return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            }
+            const amount = interaction.options.getInteger('amount');
+            if (amount < 1 || amount > 100) return interaction.reply({ content: '❌ 1-100 only.', flags: 64 });
+            
+            await interaction.deferReply({ flags: 64 });
+            try {
+                const messages = await interaction.channel.messages.fetch({ limit: amount });
+                if (messages.size === 0) return interaction.editReply({ content: '❌ No messages.' });
+                await interaction.channel.bulkDelete(messages, true);
+                await interaction.editReply({ content: `✅ Cleared ${messages.size} messages.` });
+            } catch {
+                await interaction.editReply({ content: '❌ Failed. Messages may be too old.' });
+            }
+            return;
+        }
+        
+        // /review command
+        if (interaction.commandName === 'review') {
+            if (!interaction.member.roles.cache.has(CONFIG.REVIEW_ROLE_ID)) {
+                return interaction.reply({ content: '❌ No permission.', flags: 64 });
+            }
+            const stars = interaction.options.getInteger('stars');
+            const product = interaction.options.getString('product');
+            const reviewText = interaction.options.getString('review');
+            const starsDisplay = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
+            const color = stars === 3 ? 0xffaa00 : (stars >= 4 ? 0x00ff00 : 0xff0000);
+            
+            const embed = new EmbedBuilder()
+                .setTitle(`📝 Review for ${product}`)
+                .setDescription(`"${reviewText}"`)
+                .setColor(color)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '⭐ Rating', value: `${starsDisplay} (${stars}/5)`, inline: true },
+                    { name: '🛒 Product', value: product, inline: true },
+                    { name: '👤 Reviewer', value: interaction.user.tag, inline: true }
+                )
+                .setTimestamp();
+            
+            const reviewChannel = interaction.guild.channels.cache.get(CONFIG.REVIEW_CHANNEL_ID);
+            if (!reviewChannel) return interaction.reply({ content: '❌ Review channel not set!', flags: 64 });
+            await reviewChannel.send({ embeds: [embed] });
+            await interaction.reply({ content: `✅ Review posted!`, flags: 64 });
+            return;
+        }
+        
+        // /createpurchase command
+        if (interaction.commandName === 'createpurchase') {
+            if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to create purchases.', flags: 64 });
+            }
+            
+            const name = interaction.options.getString('name');
+            const content = interaction.options.getString('content');
+            let attachmentUrl = null, attachmentName = null;
+            
+            if (interaction.options.getAttachment('file')) {
+                const attachment = interaction.options.getAttachment('file');
+                attachmentUrl = attachment.url;
+                attachmentName = attachment.name;
+            }
+            
+            let finalContent = content || '';
+            if (attachmentUrl) {
+                if (finalContent) finalContent += '\n\n';
+                finalContent += `📎 **File:** ${attachmentName}\n🔗 **Download:** ${attachmentUrl}`;
+            }
+            
+            if (!finalContent || finalContent.trim() === '') {
+                return interaction.reply({ content: '❌ Please provide either text content or a file.', flags: 64 });
+            }
+            
+            await addPurchaseToDB(name.toLowerCase(), name, finalContent, interaction.user.tag, Date.now(), !!attachmentUrl, attachmentUrl, attachmentName);
+            await interaction.reply({ content: `✅ Purchase option **${name}** has been created!`, flags: 64 });
+            return;
+        }
+        
+        // /purchase command
+        if (interaction.commandName === 'purchase') {
+            if (!interaction.member.roles.cache.has(CONFIG.PURCHASE_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to purchase products.', flags: 64 });
+            }
+            
+            const buyer = interaction.options.getUser('user');
+            const purchases = await getAllPurchasesFromDB();
+            
+            if (purchases.size === 0) {
+                return interaction.reply({ content: '❌ No products available!', flags: 64 });
+            }
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`purchase_select_${buyer.id}_${interaction.channelId}`)
+                .setPlaceholder('Select a product to purchase')
+                .addOptions(
+                    Array.from(purchases.values()).map(product => {
+                        return new StringSelectMenuOptionBuilder()
+                            .setLabel(product.originalName.length > 100 ? product.originalName.substring(0, 97) + '...' : product.originalName)
+                            .setDescription(`Created: ${new Date(product.createdAt).toLocaleDateString()}`)
+                            .setValue(product.name)
+                            .setEmoji('🛍️');
+                    })
+                );
+            
+            await interaction.reply({
+                content: `📦 **Select a product to purchase for ${buyer}**`,
+                components: [new ActionRowBuilder().addComponents(selectMenu)],
+                flags: 64
+            });
+            return;
+        }
+        
+        // /verifyall command
+        if (interaction.commandName === 'verifyall') {
+            if (!interaction.member.roles.cache.has(CONFIG.VERIFYALL_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to use /verifyall.', flags: 64 });
+            }
+            await verifyAllMembers(interaction);
+            return;
+        }
+        
+        // /addaccount command
+        if (interaction.commandName === 'addaccount') {
+            if (!interaction.member.roles.cache.has(CONFIG.CREATE_PURCHASE_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to add accounts.', flags: 64 });
+            }
+            
+            const type = interaction.options.getString('type');
+            const accountData = interaction.options.getString('account');
+            const accountId = Math.random().toString(36).substring(2, 10).toUpperCase();
+            
+            await addAccountToDB(type, accountId, accountData, interaction.user.tag, Date.now());
+            
+            const embed = new EmbedBuilder()
+                .setTitle(`✅ Account Added to ${type.charAt(0).toUpperCase() + type.slice(1)} Storage`)
+                .setDescription(accountData)
+                .setColor(0x00ff00)
+                .setThumbnail(LOGO_URL)
+                .setFooter({ text: `Added by ${interaction.user.tag}` })
+                .setTimestamp();
+            
+            await interaction.reply({ embeds: [embed], flags: 64 });
+            await updateStorageDisplayForType(type);
+            console.log(`✅ Account added: ${type} by ${interaction.user.tag}`);
+            return;
+        }
+        
+        // /giveaccount command
+        if (interaction.commandName === 'giveaccount') {
+            if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to give accounts.', flags: 64 });
+            }
+            
+            const user = interaction.options.getUser('user');
+            const stats = await getStorageStats();
+            
+            if (stats.total === 0) {
+                return interaction.reply({ content: '❌ No accounts available!', flags: 64 });
+            }
+            
+            const categoryOptions = [];
+            if (stats.discord > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('💬 Discord Accounts').setDescription(`${stats.discord} available`).setValue('discord').setEmoji('💬'));
+            if (stats.steam > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('🎮 Steam Accounts').setDescription(`${stats.steam} available`).setValue('steam').setEmoji('🎮'));
+            if (stats.fivem > 0) categoryOptions.push(new StringSelectMenuOptionBuilder().setLabel('🚗 FiveM Accounts').setDescription(`${stats.fivem} available`).setValue('fivem').setEmoji('🚗'));
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`giveaccount_category_${user.id}_${interaction.channelId}`)
+                .setPlaceholder('Select a category...')
+                .addOptions(categoryOptions);
+            
+            await interaction.reply({
+                content: `📦 **Select a category to give an account to ${user}**`,
+                components: [new ActionRowBuilder().addComponents(selectMenu)],
+                flags: 64
+            });
+            return;
+        }
+        
+        // /givebundle command
+        if (interaction.commandName === 'givebundle') {
+            if (!interaction.member.roles.cache.has(CONFIG.GIVEACCOUNT_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to give bundles.', flags: 64 });
+            }
+            
+            const user = interaction.options.getUser('user');
+            const bundleAvailable = await isBundleAvailable();
+            
+            if (!bundleAvailable) {
+                return interaction.reply({ content: '❌ Bundle not available! Need at least 1 of each type.', flags: 64 });
+            }
+            
+            const bundle = await giveBundle();
+            if (!bundle) return interaction.reply({ content: '❌ Failed to create bundle.', flags: 64 });
+            
+            const bundleEmbed = new EmbedBuilder()
+                .setTitle(`🎁 **Bundle Given to ${user.tag}**`)
+                .setDescription(`**Discord Account:**\n${bundle.discord.content}\n\n**Steam Account:**\n${bundle.steam.content}\n\n**FiveM Account:**\n${bundle.fivem.content}`)
+                .setColor(0x00ff00)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '👤 Given by', value: interaction.user.tag, inline: true },
+                    { name: '📅 Given at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+                )
+                .setTimestamp();
+            
+            await interaction.channel.send({ embeds: [bundleEmbed] });
+            await interaction.reply({ content: `✅ **Bundle** has been given to ${user.tag}!`, flags: 64 });
+            await updateAllStorageDisplays();
+            return;
+        }
+        
+        // /giveaway command
+        if (interaction.commandName === 'giveaway') {
+            if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to start giveaways!', flags: 64 });
+            }
+            
+            const winners = interaction.options.getInteger('winners');
+            const items = interaction.options.getString('items');
+            const timeStr = interaction.options.getString('time');
+            
+            if (winners < 1 || winners > 10) {
+                return interaction.reply({ content: '❌ Winners must be between 1 and 10!', flags: 64 });
+            }
+            
+            const timeMs = parseTimeToMs(timeStr);
+            if (!timeMs) {
+                return interaction.reply({ content: '❌ Invalid time format! Use: 30m, 1h, 2d, etc.', flags: 64 });
+            }
+            
+            const endTime = Date.now() + timeMs;
+            const giveawayChannel = interaction.guild.channels.cache.get(CONFIG.GIVEAWAY_CHANNEL_ID);
+            if (!giveawayChannel) {
+                return interaction.reply({ content: '❌ Giveaway channel not configured!', flags: 64 });
+            }
+            
+            const embed = await createGiveawayEmbed({ winners, items }, endTime);
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`enter_giveaway_temp`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
+            );
+            
+            const message = await giveawayChannel.send({ embeds: [embed], components: [row] });
+            
+            const giveawayId = await saveGiveawayToDB(message.id, giveawayChannel.id, winners, items, endTime, 'Hex Mods', Date.now());
+            
+            const updatedRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`enter_giveaway_${giveawayId}`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
+            );
+            await message.edit({ components: [updatedRow] });
+            
+            await interaction.reply({ content: `✅ Giveaway started in ${giveawayChannel}!`, flags: 64 });
+            
+            setTimeout(async () => {
+                await endGiveaway(giveawayId, message.id, giveawayChannel.id);
+            }, timeMs);
+            return;
+        }
+        
+        // /reroll command
+        if (interaction.commandName === 'reroll') {
+            if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
+                return interaction.reply({ content: '❌ You do not have permission to reroll giveaways!', flags: 64 });
+            }
+            
+            const giveawayId = parseInt(interaction.options.getString('giveaway_id'));
+            if (isNaN(giveawayId)) {
+                return interaction.reply({ content: '❌ Invalid giveaway ID!', flags: 64 });
+            }
+            
+            const giveaway = await getGiveawayById(giveawayId);
+            if (!giveaway) {
+                return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
+            }
+            
+            const entries = await getGiveawayEntries(giveawayId);
+            const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
+            
+            let eligibleEntries = [];
+            for (const userId of entries) {
+                try {
+                    const member = await interaction.guild.members.fetch(userId);
+                    if (member && (!verifiedRole || member.roles.cache.has(verifiedRole.id))) {
+                        eligibleEntries.push(userId);
+                    }
+                } catch (error) {}
+            }
+            
+            if (eligibleEntries.length === 0) {
+                return interaction.reply({ content: '❌ No eligible entries to reroll!', flags: 64 });
+            }
+            
+            const winner = eligibleEntries[Math.floor(Math.random() * eligibleEntries.length)];
+            
+            const rerollEmbed = new EmbedBuilder()
+                .setTitle('🎉 **GIVEAWAY REROLLED** 🎉')
+                .setDescription(`**Prize:** ${giveaway.items}\n**New Winner:** <@${winner}>`)
+                .setColor(0xff00ff)
+                .setThumbnail(LOGO_URL)
+                .addFields(
+                    { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
+                )
+                .setTimestamp();
+            
+            const channel = interaction.guild.channels.cache.get(giveaway.channel_id);
+            if (channel) {
+                await channel.send({ embeds: [rerollEmbed] });
+            }
+            
+            await interaction.reply({ content: `✅ New winner selected: <@${winner}>`, flags: 64 });
+            return;
+        }
+        
         return;
     }
 });
