@@ -47,7 +47,6 @@ async function initDatabase() {
                 is_open BOOLEAN DEFAULT TRUE
             )
         `);
-        // Giveaway tables
         await pool.query(`
             CREATE TABLE IF NOT EXISTS giveaways (
                 id SERIAL PRIMARY KEY,
@@ -429,7 +428,7 @@ async function endGiveaway(giveawayId, messageId, channelId) {
                     .setColor(0x00ff00)
                     .setThumbnail(LOGO_URL)
                     .addFields(
-                        { name: '📝 Hoe claimen', value: `Ga naar het giveaway kanaal en klik op de **Claim Prize** knop!`, inline: false }
+                        { name: '📝 Hoe claimen', value: `Klik op de **Claim Prize** knop bij de giveaway om je prijs te claimen!`, inline: false }
                     )
                     .setTimestamp();
                 await winnerUser.send({ embeds: [dmEmbed] });
@@ -447,6 +446,90 @@ async function checkAndEndGiveaways() {
     for (const giveaway of endedGiveaways) {
         await endGiveaway(giveaway.id, giveaway.message_id, giveaway.channel_id);
     }
+}
+
+// ============================================
+// CREATE PRIZE CLAIM TICKET FUNCTIE
+// ============================================
+async function createPrizeClaimTicket(user, interaction, giveaway) {
+    const guild = interaction.guild;
+    const supportRole = guild.roles.cache.get(CONFIG.SUPPORT_ROLE_ID);
+    const adminRole = guild.roles.cache.get(CONFIG.ADMIN_ROLE_ID);
+    
+    const channel = await guild.channels.create({
+        name: `prijs-${user.username.toLowerCase()}`,
+        type: ChannelType.GuildText,
+        parent: CONFIG.PURCHASE_CATEGORY_ID,
+        permissionOverwrites: [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            { id: supportRole.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] }
+        ]
+    });
+    
+    if (adminRole) {
+        await channel.permissionOverwrites.create(adminRole, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+        });
+    }
+    
+    const createdAt = Date.now();
+    await saveTicketToDB(channel.id, user.id, 'Prijs Claim', createdAt);
+    
+    tickets.set(channel.id, { 
+        userId: user.id, 
+        claimedBy: null, 
+        createdAt: createdAt, 
+        type: 'Prijs Claim' 
+    });
+    
+    await updateTicketCountVoiceChannel();
+    
+    const embed = new EmbedBuilder()
+        .setTitle('🎁 **PRIJS CLAIM TICKET** 🎁')
+        .setDescription(`Welkom ${user}! Je prijs claim ticket is aangemaakt.\n\n**Giveaway Prijs:** ${giveaway.items}\n**Giveaway ID:** ${giveaway.id}\n**Aangemaakt:** <t:${Math.floor(createdAt / 1000)}:F>`)
+        .setColor(0x00ff00)
+        .setThumbnail(LOGO_URL)
+        .addFields(
+            { name: '📌 Instructies', value: '• Een staff member zal je zo snel mogelijk helpen\n• Vermeld hier welke prijs je hebt gewonnen\n• Wees geduldig, we reageren zo snel mogelijk', inline: false },
+            { name: '👤 Winnaar', value: user.toString(), inline: true },
+            { name: '🎁 Prijs', value: giveaway.items, inline: true },
+            { name: '🏆 Giveaway ID', value: `${giveaway.id}`, inline: true }
+        )
+        .setFooter({ text: `Prijs Claim Systeem | Hex Mods`, iconURL: client.user.displayAvatarURL() })
+        .setTimestamp();
+    
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('claim_ticket').setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎯'),
+        new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒'),
+        new ButtonBuilder().setCustomId('transcript').setLabel('Get Transcript').setStyle(ButtonStyle.Secondary).setEmoji('📄')
+    );
+    
+    let pingRoles = `${supportRole}`;
+    if (adminRole) pingRoles += ` ${adminRole}`;
+    
+    await channel.send({ content: `${user} ${pingRoles}`, embeds: [embed], components: [row] });
+    
+    try {
+        const dmEmbed = new EmbedBuilder()
+            .setTitle('🎁 **Je prijs claim ticket is aangemaakt!**')
+            .setDescription(`Je ticket voor het claimen van **${giveaway.items}** is aangemaakt in ${channel}.`)
+            .setColor(0x00ff00)
+            .setThumbnail(LOGO_URL)
+            .addFields(
+                { name: '📝 Volgende stappen', value: 'Ga naar het ticket kanaal en wacht op een staff member.', inline: false }
+            )
+            .setTimestamp();
+        await user.send({ embeds: [dmEmbed] });
+    } catch (error) {
+        console.log(`Could not DM user ${user.id}`);
+    }
+    
+    console.log(`✅ Prize claim ticket created: ${channel.id} for user ${user.id} - Prize: ${giveaway.items}`);
+    
+    return channel;
 }
 
 // ============================================
@@ -1887,7 +1970,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// CLAIM PRIZE BUTTON HANDLER
+// CLAIM PRIZE BUTTON HANDLER (MET TICKET)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
@@ -1915,17 +1998,11 @@ client.on('interactionCreate', async (interaction) => {
     
     await markEntryAsClaimed(giveawayId, interaction.user.id);
     
-    const claimEmbed = new EmbedBuilder()
-        .setTitle('🎁 **Prijs Geclaimed!** 🎁')
-        .setDescription(`Je hebt **${giveaway.items}** geclaimed van de giveaway gehost door Hex Mods!`)
-        .setColor(0x00ff00)
-        .setThumbnail(LOGO_URL)
-        .addFields(
-            { name: '📝 Instructies', value: 'Neem contact op met een admin om je prijs te ontvangen.', inline: false }
-        )
-        .setTimestamp();
+    await interaction.reply({ content: '🎫 Je prijs claim ticket wordt aangemaakt...', flags: 64 });
     
-    await interaction.reply({ embeds: [claimEmbed], flags: 64 });
+    const ticketChannel = await createPrizeClaimTicket(interaction.user, interaction, giveaway);
+    
+    await interaction.editReply({ content: `✅ Je prijs claim ticket is aangemaakt: ${ticketChannel}`, flags: 64 });
 });
 
 // ============================================
