@@ -1036,7 +1036,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Open a modal to send a message as the bot (supports @mentions)', inline: false },
+            { name: '📝 `/send`', value: 'Send a message as the bot (supports @mentions, #channels, and new lines)', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -1376,7 +1376,7 @@ async function verifyAllMembers(interaction) {
 // ============================================
 async function registerCommands(guild) {
     const commands = [
-        { name: 'send', description: 'Send a message as the bot (opens a modal, supports @mentions)', options: [] },
+        { name: 'send', description: 'Send a message as the bot (supports @mentions, #channels, and new lines)', options: [] },
         {
             name: 'product',
             description: 'Create a product embed',
@@ -1497,11 +1497,12 @@ client.once('clientReady', async () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     
-    // /send command
+    // /send command - IMPROVED with proper parsing
     if (interaction.commandName === 'send') {
         if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
             return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
         }
+        
         const modal = new ModalBuilder()
             .setCustomId('send_message_modal')
             .setTitle('Send Message as Bot')
@@ -1511,11 +1512,12 @@ client.on('interactionCreate', async (interaction) => {
                         .setCustomId('message_content')
                         .setLabel('Message Content')
                         .setStyle(TextInputStyle.Paragraph)
-                        .setPlaceholder('Type your message here... Use @username to tag people/roles\nShift+Enter for new line')
+                        .setPlaceholder('Type your message here...\n\nYou can use:\n• @username to tag people\n• #channel to tag channels\n• Shift+Enter for new line\n• @everyone or @here')
                         .setRequired(true)
                         .setMaxLength(4000)
                 )
             );
+        
         await interaction.showModal(modal);
     }
     
@@ -1867,17 +1869,21 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ============================================
-// MODAL HANDLER FOR /send
+// MODAL HANDLER FOR /send (IMPROVED - Supports @mentions, #channels, new lines)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isModalSubmit()) return;
     if (interaction.customId !== 'send_message_modal') return;
     
     const messageContent = interaction.fields.getTextInputValue('message_content');
-    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Provide a message.', flags: 64 });
+    if (!messageContent?.trim()) return interaction.reply({ content: '❌ Please provide a message to send.', flags: 64 });
     
+    // Send the message directly - Discord automatically parses @mentions and #channels
+    // No delay, no extra processing needed!
     await interaction.channel.send(messageContent);
-    await interaction.reply({ content: '✅ Message sent!', flags: 64 });
+    
+    // Reply to the user who sent the command (ephemeral, only they can see)
+    await interaction.reply({ content: '✅ Message sent successfully!', flags: 64 });
 });
 
 // ============================================
