@@ -3,7 +3,7 @@ const express = require('express');
 const { Pool } = require('pg');
 
 // ============================================
-// DATABASE CONNECTIE
+// DATABASE CONNECTION
 // ============================================
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -71,14 +71,14 @@ async function initDatabase() {
                 FOREIGN KEY (giveaway_id) REFERENCES giveaways(id) ON DELETE CASCADE
             )
         `);
-        console.log('✅ Database tabellen zijn klaar!');
+        console.log('✅ Database tables ready!');
     } catch (error) {
         console.log('❌ Database error:', error.message);
     }
 }
 
 // ============================================
-// GIVEAWAY DATABASE FUNCTIES
+// GIVEAWAY DATABASE FUNCTIONS
 // ============================================
 async function saveGiveawayToDB(messageId, channelId, winners, items, endTime, createdBy, createdAt) {
     const result = await pool.query(
@@ -165,7 +165,7 @@ async function deleteGiveawayFromDB(giveawayId) {
 }
 
 // ============================================
-// TICKET DATABASE FUNCTIES
+// TICKET DATABASE FUNCTIONS
 // ============================================
 async function saveTicketToDB(channelId, userId, ticketType, createdAt) {
     await pool.query(
@@ -217,7 +217,7 @@ async function loadAllOpenTickets() {
             type: row.ticket_type
         });
     }
-    console.log(`✅ ${ticketsMap.size} open tickets geladen uit database`);
+    console.log(`✅ ${ticketsMap.size} open tickets loaded from database`);
     return ticketsMap;
 }
 
@@ -293,7 +293,7 @@ const joinedMembers = new Set();
 const LOGO_URL = 'https://cdn.discordapp.com/attachments/1509665549410635787/1509928894361370735/hexmods.png';
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Cooldown voor storage refreshes
+// Cooldown for storage refreshes
 const lastStorageUpdate = {
     discord: 0,
     steam: 0,
@@ -302,7 +302,7 @@ const lastStorageUpdate = {
 const STORAGE_COOLDOWN = 60000;
 
 // ============================================
-// GIVEAWAY FUNCTIES
+// GIVEAWAY FUNCTIONS
 // ============================================
 function parseTimeToMs(timeStr) {
     const units = {
@@ -321,14 +321,14 @@ function parseTimeToMs(timeStr) {
 async function createGiveawayEmbed(giveaway, endTime) {
     const embed = new EmbedBuilder()
         .setTitle('🎉 **GIVEAWAY** 🎉')
-        .setDescription(`**Prijs:** ${giveaway.items}\n**Winnaars:** ${giveaway.winners}\n\nKlik op de knop hieronder om mee te doen!`)
+        .setDescription(`**Prize:** ${giveaway.items}\n**Winners:** ${giveaway.winners}\n\nClick the button below to enter!`)
         .setColor(0xff00ff)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '⏰ Resterende tijd', value: `<t:${Math.floor(endTime / 1000)}:R>`, inline: true },
-            { name: '🎁 Gehost door', value: 'Hex Mods', inline: true }
+            { name: '⏰ Time Left', value: `<t:${Math.floor(endTime / 1000)}:R>`, inline: true },
+            { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
         )
-        .setFooter({ text: 'Giveaway eindigt op', iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: 'Giveaway ends at', iconURL: client.user.displayAvatarURL() })
         .setTimestamp(endTime);
     
     return embed;
@@ -347,14 +347,14 @@ async function updateGiveawayMessage(giveawayId, messageId, channelId) {
         
         const embed = new EmbedBuilder()
             .setTitle('🎉 **GIVEAWAY** 🎉')
-            .setDescription(`**Prijs:** ${giveaway.items}\n**Winnaars:** ${giveaway.winners}\n\nKlik op de knop hieronder om mee te doen!`)
+            .setDescription(`**Prize:** ${giveaway.items}\n**Winners:** ${giveaway.winners}\n\nClick the button below to enter!`)
             .setColor(0xff00ff)
             .setThumbnail(LOGO_URL)
             .addFields(
-                { name: '⏰ Resterende tijd', value: `<t:${Math.floor(giveaway.end_time / 1000)}:R>`, inline: true },
-                { name: '🎁 Gehost door', value: 'Hex Mods', inline: true }
+                { name: '⏰ Time Left', value: `<t:${Math.floor(giveaway.end_time / 1000)}:R>`, inline: true },
+                { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
             )
-            .setFooter({ text: 'Giveaway eindigt op', iconURL: client.user.displayAvatarURL() })
+            .setFooter({ text: 'Giveaway ends at', iconURL: client.user.displayAvatarURL() })
             .setTimestamp(giveaway.end_time);
         
         await message.edit({ embeds: [embed] });
@@ -403,13 +403,13 @@ async function endGiveaway(giveawayId, messageId, channelId) {
         const message = await channel.messages.fetch(messageId);
         
         const resultEmbed = new EmbedBuilder()
-            .setTitle('🎉 **GIVEAWAY GEEÏNDIGD** 🎉')
-            .setDescription(`**Prijs:** ${giveaway.items}`)
+            .setTitle('🎉 **GIVEAWAY ENDED** 🎉')
+            .setDescription(`**Prize:** ${giveaway.items}`)
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .addFields(
-                { name: '🏆 Winnaar(s)', value: winners.length > 0 ? winners.map(w => `<@${w}>`).join(', ') : 'Geen geldige winnaars!', inline: false },
-                { name: '🎁 Gehost door', value: 'Hex Mods', inline: true }
+                { name: '🏆 Winner(s)', value: winners.length > 0 ? winners.map(w => `<@${w}>`).join(', ') : 'No eligible winners!', inline: false },
+                { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
             )
             .setTimestamp();
         
@@ -423,12 +423,12 @@ async function endGiveaway(giveawayId, messageId, channelId) {
             try {
                 const winnerUser = await client.users.fetch(winner);
                 const dmEmbed = new EmbedBuilder()
-                    .setTitle('🎉 Je hebt een Giveaway gewonnen! 🎉')
-                    .setDescription(`Je hebt **${giveaway.items}** gewonnen in de giveaway gehost door Hex Mods!`)
+                    .setTitle('🎉 You Won a Giveaway! 🎉')
+                    .setDescription(`You won **${giveaway.items}** in the giveaway hosted by Hex Mods!`)
                     .setColor(0x00ff00)
                     .setThumbnail(LOGO_URL)
                     .addFields(
-                        { name: '📝 Hoe claimen', value: `Klik op de **Claim Prize** knop bij de giveaway om je prijs te claimen!`, inline: false }
+                        { name: '📝 How to claim', value: `Click the **Claim Prize** button on the giveaway message!`, inline: false }
                     )
                     .setTimestamp();
                 await winnerUser.send({ embeds: [dmEmbed] });
@@ -449,7 +449,7 @@ async function checkAndEndGiveaways() {
 }
 
 // ============================================
-// CREATE PRIZE CLAIM TICKET FUNCTIE
+// CREATE PRIZE CLAIM TICKET FUNCTION
 // ============================================
 async function createPrizeClaimTicket(user, interaction, giveaway) {
     const guild = interaction.guild;
@@ -457,7 +457,7 @@ async function createPrizeClaimTicket(user, interaction, giveaway) {
     const adminRole = guild.roles.cache.get(CONFIG.ADMIN_ROLE_ID);
     
     const channel = await guild.channels.create({
-        name: `prijs-${user.username.toLowerCase()}`,
+        name: `prize-${user.username.toLowerCase()}`,
         type: ChannelType.GuildText,
         parent: CONFIG.PURCHASE_CATEGORY_ID,
         permissionOverwrites: [
@@ -476,29 +476,29 @@ async function createPrizeClaimTicket(user, interaction, giveaway) {
     }
     
     const createdAt = Date.now();
-    await saveTicketToDB(channel.id, user.id, 'Prijs Claim', createdAt);
+    await saveTicketToDB(channel.id, user.id, 'Prize Claim', createdAt);
     
     tickets.set(channel.id, { 
         userId: user.id, 
         claimedBy: null, 
         createdAt: createdAt, 
-        type: 'Prijs Claim' 
+        type: 'Prize Claim' 
     });
     
     await updateTicketCountVoiceChannel();
     
     const embed = new EmbedBuilder()
-        .setTitle('🎁 **PRIJS CLAIM TICKET** 🎁')
-        .setDescription(`Welkom ${user}! Je prijs claim ticket is aangemaakt.\n\n**Giveaway Prijs:** ${giveaway.items}\n**Giveaway ID:** ${giveaway.id}\n**Aangemaakt:** <t:${Math.floor(createdAt / 1000)}:F>`)
+        .setTitle('🎁 **PRIZE CLAIM TICKET** 🎁')
+        .setDescription(`Welcome ${user}! Your prize claim ticket has been created.\n\n**Giveaway Prize:** ${giveaway.items}\n**Giveaway ID:** ${giveaway.id}\n**Created:** <t:${Math.floor(createdAt / 1000)}:F>`)
         .setColor(0x00ff00)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📌 Instructies', value: '• Een staff member zal je zo snel mogelijk helpen\n• Vermeld hier welke prijs je hebt gewonnen\n• Wees geduldig, we reageren zo snel mogelijk', inline: false },
-            { name: '👤 Winnaar', value: user.toString(), inline: true },
-            { name: '🎁 Prijs', value: giveaway.items, inline: true },
+            { name: '📌 Instructions', value: '• A staff member will help you as soon as possible\n• Mention which prize you won\n• Be patient, we will respond shortly', inline: false },
+            { name: '👤 Winner', value: user.toString(), inline: true },
+            { name: '🎁 Prize', value: giveaway.items, inline: true },
             { name: '🏆 Giveaway ID', value: `${giveaway.id}`, inline: true }
         )
-        .setFooter({ text: `Prijs Claim Systeem | Hex Mods`, iconURL: client.user.displayAvatarURL() })
+        .setFooter({ text: `Prize Claim System | Hex Mods`, iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
     
     const row = new ActionRowBuilder().addComponents(
@@ -514,12 +514,12 @@ async function createPrizeClaimTicket(user, interaction, giveaway) {
     
     try {
         const dmEmbed = new EmbedBuilder()
-            .setTitle('🎁 **Je prijs claim ticket is aangemaakt!**')
-            .setDescription(`Je ticket voor het claimen van **${giveaway.items}** is aangemaakt in ${channel}.`)
+            .setTitle('🎁 **Your Prize Claim Ticket Has Been Created!**')
+            .setDescription(`Your ticket for claiming **${giveaway.items}** has been created in ${channel}.`)
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .addFields(
-                { name: '📝 Volgende stappen', value: 'Ga naar het ticket kanaal en wacht op een staff member.', inline: false }
+                { name: '📝 Next Steps', value: 'Go to the ticket channel and wait for a staff member.', inline: false }
             )
             .setTimestamp();
         await user.send({ embeds: [dmEmbed] });
@@ -533,7 +533,7 @@ async function createPrizeClaimTicket(user, interaction, giveaway) {
 }
 
 // ============================================
-// DATABASE FUNCTIES - STORAGE
+// DATABASE FUNCTIONS - STORAGE
 // ============================================
 async function addAccountToDB(type, accountId, content, addedBy, addedAt) {
     await pool.query(
@@ -615,7 +615,7 @@ async function removeRandomAccounts(type, amount) {
 }
 
 // ============================================
-// DATABASE FUNCTIES - PURCHASES
+// DATABASE FUNCTIONS - PURCHASES
 // ============================================
 async function addPurchaseToDB(name, originalName, content, createdBy, createdAt, hasFile, fileUrl, fileName) {
     await pool.query(
@@ -684,32 +684,32 @@ async function updateStorageDisplayForType(type) {
         const messages = await storageChannel.messages.fetch();
         if (messages.size > 0) {
             await storageChannel.bulkDelete(messages);
-            console.log(`🗑️ ${messages.size} oude berichten verwijderd uit ${type} kanaal`);
+            console.log(`🗑️ ${messages.size} old messages deleted from ${type} channel`);
         }
     } catch (error) {
-        console.log(`⚠️ Kon niet alle berichten verwijderen in ${type} kanaal:`, error.message);
+        console.log(`⚠️ Could not delete all messages in ${type} channel:`, error.message);
     }
     
     const count = await getAccountCount(type);
     const accounts = await getAllAccountsByType(type);
-    const accountList = accounts.map((a, index) => `${index + 1}. ${a.content.substring(0, 80)}...`).join('\n') || '`Geen accounts beschikbaar`';
+    const accountList = accounts.map((a, index) => `${index + 1}. ${a.content.substring(0, 80)}...`).join('\n') || '`No accounts available`';
     
     const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(`**Aantal accounts:** ${count}\n*Laatst bijgewerkt: <t:${Math.floor(Date.now() / 1000)}:R>*`)
+        .setDescription(`**Account count:** ${count}\n*Last updated: <t:${Math.floor(Date.now() / 1000)}:R>*`)
         .setColor(color)
         .setThumbnail(LOGO_URL)
         .addFields({ name: `📋 **Accounts**`, value: accountList.length > 1000 ? accountList.substring(0, 997) + '...' : accountList, inline: false })
-        .setFooter({ text: `Accounts worden automatisch verwijderd na uitgifte | Gebruik /giveaccount` })
+        .setFooter({ text: `Accounts are automatically removed after giveaway | Use /giveaccount` })
         .setTimestamp();
     
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`refresh_${type}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`export_${type}`).setLabel('📋 Exporteer').setStyle(ButtonStyle.Primary)
+        new ButtonBuilder().setCustomId(`export_${type}`).setLabel('📋 Export').setStyle(ButtonStyle.Primary)
     );
     
     await storageChannel.send({ embeds: [embed], components: [row] });
-    console.log(`✅ Nieuw storage bericht verzonden in ${type} kanaal`);
+    console.log(`✅ New storage message sent in ${type} channel`);
 }
 
 async function updateAllStorageDisplays() {
@@ -1046,8 +1046,8 @@ async function sendCommandInfoMessage(guild) {
             { name: '➕ `/addaccount <type> <account>`', value: 'Add an account to storage (types: discord/steam/fivem)', inline: false },
             { name: '🎁 `/giveaccount <user>`', value: 'Give random account(s) to a user (choose category + amount)', inline: false },
             { name: '🎁 `/givebundle <user>`', value: 'Give a bundle (1 Discord + 1 Steam + 1 FiveM account)', inline: false },
-            { name: '🎉 `/giveaway <winners> <items> <time>`', value: 'Start een giveaway! (bijv. /giveaway 5 "Game Keys" 2d)', inline: false },
-            { name: '🔄 `/reroll <giveaway_id>`', value: 'Herrol een giveaway (admin only)', inline: false }
+            { name: '🎉 `/giveaway <winners> <items> <time>`', value: 'Start a giveaway! (e.g., /giveaway 5 "Game Keys" 2d)', inline: false },
+            { name: '🔄 `/reroll <giveaway_id>`', value: 'Reroll a giveaway (admin only)', inline: false }
         )
         .setFooter({ text: `Total commands: 12 | Use /send to send messages as the bot` })
         .setTimestamp();
@@ -1421,18 +1421,18 @@ async function registerCommands(guild) {
         { name: 'givebundle', description: 'Give a bundle (1 Discord, 1 Steam, 1 FiveM account)', options: [{ name: 'user', description: 'The user to give the bundle to', type: 6, required: true }] },
         {
             name: 'giveaway',
-            description: 'Start een giveaway (admin only)',
+            description: 'Start a giveaway (admin only)',
             options: [
-                { name: 'winners', description: 'Aantal winnaars', type: 4, required: true },
-                { name: 'items', description: 'Wat wordt er weggegeven?', type: 3, required: true },
-                { name: 'time', description: 'Tijd tot einde (bijv. 1h, 2d, 30m)', type: 3, required: true }
+                { name: 'winners', description: 'Number of winners', type: 4, required: true },
+                { name: 'items', description: 'What is being given away?', type: 3, required: true },
+                { name: 'time', description: 'Time until end (e.g., 1h, 2d, 30m)', type: 3, required: true }
             ]
         },
         {
             name: 'reroll',
-            description: 'Herrol een giveaway (admin only)',
+            description: 'Reroll a giveaway (admin only)',
             options: [
-                { name: 'giveaway_id', description: 'Het ID van de giveaway om te herrollen', type: 3, required: true }
+                { name: 'giveaway_id', description: 'The ID of the giveaway to reroll', type: 3, required: true }
             ]
         }
     ];
@@ -1699,7 +1699,7 @@ client.on('interactionCreate', async (interaction) => {
         
         await updateStorageDisplayForType(type);
         
-        console.log(`✅ Account toegevoegd: ${type} door ${interaction.user.tag}`);
+        console.log(`✅ Account added: ${type} by ${interaction.user.tag}`);
     }
     
     // /giveaccount command
@@ -1754,8 +1754,8 @@ client.on('interactionCreate', async (interaction) => {
             .setColor(0x00ff00)
             .setThumbnail(LOGO_URL)
             .addFields(
-                { name: '👤 Gegeven door', value: interaction.user.tag, inline: true },
-                { name: '📅 Gegeven op', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+                { name: '👤 Given by', value: interaction.user.tag, inline: true },
+                { name: '📅 Given at', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
             .setTimestamp();
         
@@ -1769,7 +1769,7 @@ client.on('interactionCreate', async (interaction) => {
     // /GIVEAWAY COMMAND
     if (interaction.commandName === 'giveaway') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
-            return interaction.reply({ content: '❌ Je hebt geen permissie om giveaways te starten!', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to start giveaways!', flags: 64 });
         }
         
         const winners = interaction.options.getInteger('winners');
@@ -1777,23 +1777,23 @@ client.on('interactionCreate', async (interaction) => {
         const timeStr = interaction.options.getString('time');
         
         if (winners < 1 || winners > 10) {
-            return interaction.reply({ content: '❌ Winnaars moet tussen 1 en 10 zijn!', flags: 64 });
+            return interaction.reply({ content: '❌ Winners must be between 1 and 10!', flags: 64 });
         }
         
         const timeMs = parseTimeToMs(timeStr);
         if (!timeMs) {
-            return interaction.reply({ content: '❌ Ongeldig tijd formaat! Gebruik: 30m, 1h, 2d, etc.', flags: 64 });
+            return interaction.reply({ content: '❌ Invalid time format! Use: 30m, 1h, 2d, etc.', flags: 64 });
         }
         
         const endTime = Date.now() + timeMs;
         const giveawayChannel = interaction.guild.channels.cache.get(CONFIG.GIVEAWAY_CHANNEL_ID);
         if (!giveawayChannel) {
-            return interaction.reply({ content: '❌ Giveaway kanaal is niet geconfigureerd!', flags: 64 });
+            return interaction.reply({ content: '❌ Giveaway channel not configured!', flags: 64 });
         }
         
         const embed = await createGiveawayEmbed({ winners, items }, endTime);
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`enter_giveaway_temp`).setLabel('🎉 Doe Mee').setStyle(ButtonStyle.Success).setEmoji('🎁')
+            new ButtonBuilder().setCustomId(`enter_giveaway_temp`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
         );
         
         const message = await giveawayChannel.send({ embeds: [embed], components: [row] });
@@ -1801,11 +1801,11 @@ client.on('interactionCreate', async (interaction) => {
         const giveawayId = await saveGiveawayToDB(message.id, giveawayChannel.id, winners, items, endTime, 'Hex Mods', Date.now());
         
         const updatedRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`enter_giveaway_${giveawayId}`).setLabel('🎉 Doe Mee').setStyle(ButtonStyle.Success).setEmoji('🎁')
+            new ButtonBuilder().setCustomId(`enter_giveaway_${giveawayId}`).setLabel('🎉 Enter').setStyle(ButtonStyle.Success).setEmoji('🎁')
         );
         await message.edit({ components: [updatedRow] });
         
-        await interaction.reply({ content: `✅ Giveaway gestart in ${giveawayChannel}!`, flags: 64 });
+        await interaction.reply({ content: `✅ Giveaway started in ${giveawayChannel}!`, flags: 64 });
         
         setTimeout(async () => {
             await endGiveaway(giveawayId, message.id, giveawayChannel.id);
@@ -1815,17 +1815,17 @@ client.on('interactionCreate', async (interaction) => {
     // /REROLL COMMAND
     if (interaction.commandName === 'reroll') {
         if (!interaction.member.roles.cache.has(CONFIG.GIVEAWAY_ROLE_ID)) {
-            return interaction.reply({ content: '❌ Je hebt geen permissie om giveaways te herrollen!', flags: 64 });
+            return interaction.reply({ content: '❌ You do not have permission to reroll giveaways!', flags: 64 });
         }
         
         const giveawayId = parseInt(interaction.options.getString('giveaway_id'));
         if (isNaN(giveawayId)) {
-            return interaction.reply({ content: '❌ Ongeldig giveaway ID!', flags: 64 });
+            return interaction.reply({ content: '❌ Invalid giveaway ID!', flags: 64 });
         }
         
         const giveaway = await getGiveawayById(giveawayId);
         if (!giveaway) {
-            return interaction.reply({ content: '❌ Giveaway niet gevonden!', flags: 64 });
+            return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
         }
         
         const entries = await getGiveawayEntries(giveawayId);
@@ -1842,18 +1842,18 @@ client.on('interactionCreate', async (interaction) => {
         }
         
         if (eligibleEntries.length === 0) {
-            return interaction.reply({ content: '❌ Geen geldige deelnemers om te herrollen!', flags: 64 });
+            return interaction.reply({ content: '❌ No eligible entries to reroll!', flags: 64 });
         }
         
         const winner = eligibleEntries[Math.floor(Math.random() * eligibleEntries.length)];
         
         const rerollEmbed = new EmbedBuilder()
-            .setTitle('🎉 **GIVEAWAY HEROLLED** 🎉')
-            .setDescription(`**Prijs:** ${giveaway.items}\n**Nieuwe Winnaar:** <@${winner}>`)
+            .setTitle('🎉 **GIVEAWAY REROLLED** 🎉')
+            .setDescription(`**Prize:** ${giveaway.items}\n**New Winner:** <@${winner}>`)
             .setColor(0xff00ff)
             .setThumbnail(LOGO_URL)
             .addFields(
-                { name: '🎁 Gehost door', value: 'Hex Mods', inline: true }
+                { name: '🎁 Hosted by', value: 'Hex Mods', inline: true }
             )
             .setTimestamp();
         
@@ -1862,7 +1862,7 @@ client.on('interactionCreate', async (interaction) => {
             await channel.send({ embeds: [rerollEmbed] });
         }
         
-        await interaction.reply({ content: `✅ Nieuwe winnaar geselecteerd: <@${winner}>`, flags: 64 });
+        await interaction.reply({ content: `✅ New winner selected: <@${winner}>`, flags: 64 });
     }
 });
 
@@ -1946,31 +1946,31 @@ client.on('interactionCreate', async (interaction) => {
     
     const giveaway = await getGiveawayById(giveawayId);
     if (!giveaway || !giveaway.is_active) {
-        return interaction.reply({ content: '❌ Deze giveaway is al afgelopen!', flags: 64 });
+        return interaction.reply({ content: '❌ This giveaway has already ended!', flags: 64 });
     }
     
     if (Date.now() >= giveaway.end_time) {
         await endGiveaway(giveawayId, giveaway.message_id, giveaway.channel_id);
-        return interaction.reply({ content: '❌ Deze giveaway is afgelopen!', flags: 64 });
+        return interaction.reply({ content: '❌ This giveaway has ended!', flags: 64 });
     }
     
     const hasEntered = await hasUserEnteredGiveaway(giveawayId, interaction.user.id);
     if (hasEntered) {
-        return interaction.reply({ content: '❌ Je doet al mee aan deze giveaway!', flags: 64 });
+        return interaction.reply({ content: '❌ You have already entered this giveaway!', flags: 64 });
     }
     
     const verifiedRole = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
     if (verifiedRole && !interaction.member.roles.cache.has(verifiedRole.id)) {
-        return interaction.reply({ content: '❌ Je moet geverifieerd zijn om mee te doen aan giveaways!', flags: 64 });
+        return interaction.reply({ content: '❌ You need to be verified to enter giveaways!', flags: 64 });
     }
     
     await saveEntryToDB(giveawayId, interaction.user.id, Date.now());
     
-    await interaction.reply({ content: '✅ Je doet mee aan de giveaway! Veel succes!', flags: 64 });
+    await interaction.reply({ content: '✅ You have entered the giveaway! Good luck!', flags: 64 });
 });
 
 // ============================================
-// CLAIM PRIZE BUTTON HANDLER (MET TICKET)
+// CLAIM PRIZE BUTTON HANDLER (WITH TICKET)
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
@@ -1981,28 +1981,28 @@ client.on('interactionCreate', async (interaction) => {
     
     const giveaway = await getGiveawayById(giveawayId);
     if (!giveaway) {
-        return interaction.reply({ content: '❌ Giveaway niet gevonden!', flags: 64 });
+        return interaction.reply({ content: '❌ Giveaway not found!', flags: 64 });
     }
     
     const winnersList = giveaway.winners_list ? giveaway.winners_list.split(',') : [];
     if (!winnersList.includes(interaction.user.id)) {
-        return interaction.reply({ content: '❌ Je bent geen winnaar van deze giveaway!', flags: 64 });
+        return interaction.reply({ content: '❌ You are not a winner of this giveaway!', flags: 64 });
     }
     
     const allEntries = await getAllGiveawayEntries(giveawayId);
     const userEntry = allEntries.find(entry => entry.user_id === interaction.user.id);
     
     if (userEntry && userEntry.has_claimed) {
-        return interaction.reply({ content: '❌ Je hebt je prijs al geclaimed!', flags: 64 });
+        return interaction.reply({ content: '❌ You have already claimed your prize!', flags: 64 });
     }
     
     await markEntryAsClaimed(giveawayId, interaction.user.id);
     
-    await interaction.reply({ content: '🎫 Je prijs claim ticket wordt aangemaakt...', flags: 64 });
+    await interaction.reply({ content: '🎫 Creating your prize claim ticket...', flags: 64 });
     
     const ticketChannel = await createPrizeClaimTicket(interaction.user, interaction, giveaway);
     
-    await interaction.editReply({ content: `✅ Je prijs claim ticket is aangemaakt: ${ticketChannel}`, flags: 64 });
+    await interaction.editReply({ content: `✅ Your prize claim ticket has been created: ${ticketChannel}`, flags: 64 });
 });
 
 // ============================================
@@ -2342,7 +2342,7 @@ client.on('interactionCreate', async (interaction) => {
     }
     
     if (!ticketData) {
-        console.log(`⚠️ Geen ticket data gevonden voor ${interaction.channelId}`);
+        console.log(`⚠️ No ticket data found for ${interaction.channelId}`);
         return interaction.reply({ content: '❌ Ticket not found! Please contact an admin.', flags: 64 });
     }
     
