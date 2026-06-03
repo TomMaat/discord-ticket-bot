@@ -307,9 +307,6 @@ const lastStorageUpdate = {
 };
 const STORAGE_COOLDOWN = 60000;
 
-// Store active message collectors
-const activeCollectors = new Map();
-
 // ============================================
 // GIVEAWAY FUNCTIONS
 // ============================================
@@ -1045,7 +1042,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Type a message that will be sent as the bot (supports @mentions, #channels, @roles)', inline: false },
+            { name: '📝 `/send`', value: 'Type a message that will be sent as the bot (supports @mentions, #channels, @roles) - Your message is hidden', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -1991,7 +1988,7 @@ client.on('interactionCreate', async (interaction) => {
     
     // Handle SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
-        // /send command - NEW VERSION with message collector (full Discord suggestions!)
+        // /send command - NO DELAY VERSION (message deleted instantly)
         if (interaction.commandName === 'send') {
             if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
                 return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
@@ -1999,7 +1996,7 @@ client.on('interactionCreate', async (interaction) => {
             
             const embed = new EmbedBuilder()
                 .setTitle('📝 **Type your message below**')
-                .setDescription('Typ je bericht in **dit kanaal** en het wordt verzonden als de bot.\n\n**Je kunt gebruiken:**\n• `@username` om mensen te taggen (met suggesties!)\n• `#channel` om kanalen te taggen\n• `@role` om rollen te taggen\n• `@everyone` of `@here`\n\nTyp `cancel` om te annuleren.')
+                .setDescription('Typ je bericht in **dit kanaal** en het wordt direct verzonden als de bot.\n\n**Je kunt gebruiken:**\n• `@username` om mensen te taggen (met suggesties!)\n• `#channel` om kanalen te taggen\n• `@role` om rollen te taggen\n• `@everyone` of `@here`\n\nTyp `cancel` om te annuleren.')
                 .setColor(0x5865F2)
                 .setThumbnail(LOGO_URL)
                 .setFooter({ text: 'Je hebt 60 seconden om te reageren' })
@@ -2012,14 +2009,15 @@ client.on('interactionCreate', async (interaction) => {
             const collector = interaction.channel.createMessageCollector({ filter, time: 60000, max: 1 });
             
             collector.on('collect', async (msg) => {
+                // Delete the user's message IMMEDIATELY (no delay - nobody sees it)
+                await msg.delete().catch(() => {});
+                
                 if (msg.content.toLowerCase() === 'cancel') {
-                    await msg.delete().catch(() => {});
                     return interaction.followUp({ content: '❌ Bericht geannuleerd.', flags: 64 });
                 }
                 
-                // Send the message as the bot (Discord automatically parses all mentions!)
+                // Send the message as the bot
                 await interaction.channel.send(msg.content);
-                await msg.delete().catch(() => {});
                 await interaction.followUp({ content: '✅ Bericht verzonden!', flags: 64 });
             });
             
