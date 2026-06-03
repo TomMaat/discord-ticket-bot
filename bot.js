@@ -1492,13 +1492,12 @@ client.once('clientReady', async () => {
 });
 
 // ============================================
-// SINGLE INTERACTION HANDLER (FIXED - NO CONFLICTS)
+// SINGLE INTERACTION HANDLER
 // ============================================
 client.on('interactionCreate', async (interaction) => {
     // Handle MODAL SUBMITS first
     if (interaction.isModalSubmit()) {
         if (interaction.customId === 'send_message_modal') {
-            // Defer the reply immediately to prevent timeout
             await interaction.deferReply({ flags: 64 });
             
             const messageContent = interaction.fields.getTextInputValue('message_content');
@@ -1516,7 +1515,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Handle other modals
         if (interaction.customId === 'staff_application_modal') {
             const age = interaction.fields.getTextInputValue('staff_age');
             const experience = interaction.fields.getTextInputValue('staff_experience');
@@ -1562,7 +1560,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Handle giveaccount amount modal
         if (interaction.customId.startsWith('giveaccount_amount_')) {
             const parts = interaction.customId.split('_');
             const userId = parts[2];
@@ -1607,7 +1604,6 @@ client.on('interactionCreate', async (interaction) => {
     
     // Handle BUTTONS
     if (interaction.isButton()) {
-        // Giveaway entry buttons
         if (interaction.customId.startsWith('enter_giveaway_')) {
             const giveawayId = parseInt(interaction.customId.replace('enter_giveaway_', ''));
             if (isNaN(giveawayId)) return;
@@ -1637,7 +1633,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Claim prize buttons
         if (interaction.customId.startsWith('claim_prize_')) {
             const giveawayId = parseInt(interaction.customId.replace('claim_prize_', ''));
             if (isNaN(giveawayId)) return;
@@ -1666,7 +1661,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Refresh storage buttons
         if (interaction.customId === 'refresh_discord' || interaction.customId === 'refresh_steam' || interaction.customId === 'refresh_fivem') {
             const type = interaction.customId.replace('refresh_', '');
             const now = Date.now();
@@ -1683,7 +1677,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Export storage buttons
         if (interaction.customId === 'export_discord' || interaction.customId === 'export_steam' || interaction.customId === 'export_fivem') {
             const type = interaction.customId.replace('export_', '');
             const accounts = await getAllAccountsByType(type);
@@ -1700,7 +1693,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Role claim buttons
         const roleMap = {
             'claim_spoof': CONFIG.SPOOF_ACCOUNTS_ROLE_ID,
             'claim_trigger': CONFIG.TRIGGER_SHOP_ROLE_ID,
@@ -1751,7 +1743,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Buy product button
         if (interaction.customId.startsWith('buy_')) {
             const product = client.products?.get(interaction.customId);
             const name = product?.name || 'Unknown';
@@ -1784,7 +1775,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Verification button
         if (interaction.customId === 'verify_button') {
             const verified = interaction.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
             const unverified = interaction.guild.roles.cache.get(CONFIG.UNVERIFIED_ROLE_ID);
@@ -1815,7 +1805,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Support ticket category selection
         let catId = null, type = null;
         if (interaction.customId === 'general_ticket') { catId = CONFIG.GENERAL_CATEGORY_ID; type = 'General Question'; }
         else if (interaction.customId === 'purchase_ticket') { catId = CONFIG.PURCHASE_CATEGORY_ID; type = 'Purchase'; }
@@ -1831,7 +1820,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Application buttons
         if (interaction.customId === 'apply_staff') {
             for (const [, data] of tickets) {
                 if (data.userId === interaction.user.id) return interaction.reply({ content: `❌ You already have an open ticket/application!`, flags: 64 });
@@ -1856,7 +1844,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Ticket management buttons
         let ticketData = tickets.get(interaction.channelId);
         
         if (!ticketData) {
@@ -1871,7 +1858,6 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: '❌ Ticket not found! Please contact an admin.', flags: 64 });
         }
         
-        // Claim ticket
         if (interaction.customId === 'claim_ticket') {
             if (!interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID)) {
                 return interaction.reply({ content: '❌ You do not have permission to claim tickets!', flags: 64 });
@@ -1903,7 +1889,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Close ticket
         if (interaction.customId === 'close_ticket') {
             const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
             if (!hasPerm) {
@@ -1929,7 +1914,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Get transcript
         if (interaction.customId === 'transcript') {
             const hasPerm = interaction.member.roles.cache.has(CONFIG.SUPPORT_ROLE_ID) || ticketData.userId === interaction.user.id;
             if (!hasPerm) {
@@ -2016,7 +2000,7 @@ client.on('interactionCreate', async (interaction) => {
     
     // Handle SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
-        // /send command
+        // /send command - FIXED with shorter placeholder
         if (interaction.commandName === 'send') {
             if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
                 return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
@@ -2031,7 +2015,7 @@ client.on('interactionCreate', async (interaction) => {
                             .setCustomId('message_content')
                             .setLabel('Message Content')
                             .setStyle(TextInputStyle.Paragraph)
-                            .setPlaceholder('Type your message here...\n\nYou can use:\n• @username to tag people\n• #channel to tag channels\n• Shift+Enter for new line\n• @everyone or @here')
+                            .setPlaceholder('Type your message here... (supports @mentions, #channels, new lines)')
                             .setRequired(true)
                             .setMaxLength(4000)
                     )
