@@ -1988,7 +1988,7 @@ client.on('interactionCreate', async (interaction) => {
     
     // Handle SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
-        // /send command - NO DELAY VERSION (message deleted instantly)
+        // /send command - MET AUTO-VERWIJDEREN VAN INSTRUCTIE BERICHT
         if (interaction.commandName === 'send') {
             if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
                 return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
@@ -1999,30 +1999,35 @@ client.on('interactionCreate', async (interaction) => {
                 .setDescription('Typ je bericht in **dit kanaal** en het wordt direct verzonden als de bot.\n\n**Je kunt gebruiken:**\n• `@username` om mensen te taggen (met suggesties!)\n• `#channel` om kanalen te taggen\n• `@role` om rollen te taggen\n• `@everyone` of `@here`\n\nTyp `cancel` om te annuleren.')
                 .setColor(0x5865F2)
                 .setThumbnail(LOGO_URL)
-                .setFooter({ text: 'Je hebt 60 seconden om te reageren' })
+                .setFooter({ text: 'Je hebt 60 seconden om te reageren | Dit bericht verdwijnt automatisch' })
                 .setTimestamp();
             
-            await interaction.reply({ embeds: [embed], flags: 64 });
+            // Stuur het instructie bericht en sla het op
+            const instructionMsg = await interaction.reply({ embeds: [embed], fetchReply: true });
             
-            // Filter for the same user in the same channel
+            // Filter voor dezelfde gebruiker in hetzelfde kanaal
             const filter = m => m.author.id === interaction.user.id && m.channel.id === interaction.channel.id;
             const collector = interaction.channel.createMessageCollector({ filter, time: 60000, max: 1 });
             
             collector.on('collect', async (msg) => {
-                // Delete the user's message IMMEDIATELY (no delay - nobody sees it)
+                // Verwijder het instructie bericht meteen
+                await instructionMsg.delete().catch(() => {});
+                
+                // Verwijder het bericht van de gebruiker (niemand ziet het)
                 await msg.delete().catch(() => {});
                 
                 if (msg.content.toLowerCase() === 'cancel') {
                     return interaction.followUp({ content: '❌ Bericht geannuleerd.', flags: 64 });
                 }
                 
-                // Send the message as the bot
+                // Verzend het bericht als de bot
                 await interaction.channel.send(msg.content);
                 await interaction.followUp({ content: '✅ Bericht verzonden!', flags: 64 });
             });
             
             collector.on('end', async (collected) => {
                 if (collected.size === 0) {
+                    await instructionMsg.delete().catch(() => {});
                     await interaction.followUp({ content: '❌ Timeout! Je hebt niet op tijd gereageerd.', flags: 64 });
                 }
             });
