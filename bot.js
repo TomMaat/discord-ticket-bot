@@ -1042,7 +1042,7 @@ async function sendCommandInfoMessage(guild) {
         .setColor(0x5865F2)
         .setThumbnail(LOGO_URL)
         .addFields(
-            { name: '📝 `/send`', value: 'Type a message that will be sent as the bot (supports @mentions, #channels, @roles) - Your message is hidden', inline: false },
+            { name: '📝 `/send`', value: 'Send a message as the bot (only you see the instructions, your message is hidden)', inline: false },
             { name: '🛒 `/product`', value: 'Create a product embed with name, stock, price, description, and image', inline: false },
             { name: '🗑️ `/clear <amount>`', value: 'Clear messages from a channel (1-100 messages)', inline: false },
             { name: '⭐ `/review <stars> <product> <review>`', value: 'Leave a review for a product', inline: false },
@@ -1382,7 +1382,7 @@ async function verifyAllMembers(interaction) {
 // ============================================
 async function registerCommands(guild) {
     const commands = [
-        { name: 'send', description: 'Send a message as the bot (type your message after the command)', options: [] },
+        { name: 'send', description: 'Send a message as the bot (only you see the instructions)', options: [] },
         {
             name: 'product',
             description: 'Create a product embed',
@@ -1988,32 +1988,23 @@ client.on('interactionCreate', async (interaction) => {
     
     // Handle SLASH COMMANDS
     if (interaction.isChatInputCommand()) {
-        // /send command - MET AUTO-VERWIJDEREN VAN INSTRUCTIE BERICHT
+        // /send command - EPHEMERAL (alleen jij ziet het instructie bericht!)
         if (interaction.commandName === 'send') {
             if (!interaction.member.roles.cache.has(CONFIG.SEND_ROLE_ID)) {
                 return interaction.reply({ content: '❌ You do not have permission to use `/send`.', flags: 64 });
             }
             
-            const embed = new EmbedBuilder()
-                .setTitle('📝 **Type your message below**')
-                .setDescription('Typ je bericht in **dit kanaal** en het wordt direct verzonden als de bot.\n\n**Je kunt gebruiken:**\n• `@username` om mensen te taggen (met suggesties!)\n• `#channel` om kanalen te taggen\n• `@role` om rollen te taggen\n• `@everyone` of `@here`\n\nTyp `cancel` om te annuleren.')
-                .setColor(0x5865F2)
-                .setThumbnail(LOGO_URL)
-                .setFooter({ text: 'Je hebt 60 seconden om te reageren | Dit bericht verdwijnt automatisch' })
-                .setTimestamp();
+            // EPHEMERAL bericht - ALLEEN de gebruiker ziet dit!
+            await interaction.reply({ 
+                content: '📝 **Typ je bericht hieronder in dit kanaal.**\n\nJe kunt gebruiken: @gebruikers, #kanalen, @rollen, @everyone, @here\nTyp `cancel` om te annuleren.\n\n⏱️ Je hebt 60 seconden de tijd.',
+                flags: 64  // <-- Alleen jij ziet dit!
+            });
             
-            // Stuur het instructie bericht en sla het op
-            const instructionMsg = await interaction.reply({ embeds: [embed], fetchReply: true });
-            
-            // Filter voor dezelfde gebruiker in hetzelfde kanaal
             const filter = m => m.author.id === interaction.user.id && m.channel.id === interaction.channel.id;
             const collector = interaction.channel.createMessageCollector({ filter, time: 60000, max: 1 });
             
             collector.on('collect', async (msg) => {
-                // Verwijder het instructie bericht meteen
-                await instructionMsg.delete().catch(() => {});
-                
-                // Verwijder het bericht van de gebruiker (niemand ziet het)
+                // Verwijder het bericht van de gebruiker DIRECT (niemand ziet het)
                 await msg.delete().catch(() => {});
                 
                 if (msg.content.toLowerCase() === 'cancel') {
@@ -2027,7 +2018,6 @@ client.on('interactionCreate', async (interaction) => {
             
             collector.on('end', async (collected) => {
                 if (collected.size === 0) {
-                    await instructionMsg.delete().catch(() => {});
                     await interaction.followUp({ content: '❌ Timeout! Je hebt niet op tijd gereageerd.', flags: 64 });
                 }
             });
