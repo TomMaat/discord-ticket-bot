@@ -213,18 +213,104 @@ async function getTicketFromDB(channelId) {
 }
 
 async function loadAllOpenTickets() {
-    const result = await pool.query(`SELECT * FROM tickets_db WHERE is_open = TRUE`);
-    const ticketsMap = new Map();
-    for (const row of result.rows) {
-        ticketsMap.set(row.channel_id, {
-            userId: row.user_id,
-            claimedBy: row.claimed_by,
-            createdAt: row.created_at,
-            type: row.ticket_type
-        });
+    try {
+        const result = await pool.query(`SELECT * FROM tickets_db WHERE is_open = TRUE`);
+        const ticketsMap = new Map();
+        for (const row of result.rows) {
+            ticketsMap.set(row.channel_id, {
+                userId: row.user_id,
+                claimedBy: row.claimed_by,
+                createdAt: row.created_at,
+                type: row.ticket_type,
+                isOpen: row.is_open
+            });
+        }
+        console.log(`✅ ${ticketsMap.size} open tickets loaded from database`);
+        return ticketsMap;
+    } catch (error) {
+        console.log('❌ Error loading tickets from database:', error.message);
+        return new Map();
     }
-    console.log(`✅ ${ticketsMap.size} open tickets loaded from database`);
-    return ticketsMap;
+}
+
+// ============================================
+// TICKET COUNT FUNCTIONS - UPDATED
+// ============================================
+async function countAllOpenTickets() {
+    try {
+        // Tel via database (meest betrouwbaar)
+        const result = await pool.query('SELECT COUNT(*) FROM tickets_db WHERE is_open = TRUE');
+        const dbCount = parseInt(result.rows[0].count);
+        
+        if (dbCount > 0) {
+            return dbCount;
+        }
+        
+        // Fallback: tel via categorieën
+        const guild = client.guilds.cache.first();
+        if (!guild) return 0;
+        
+        let count = 0;
+        const categoryIds = [
+            CONFIG.GENERAL_CATEGORY_ID,
+            CONFIG.PURCHASE_CATEGORY_ID,
+            CONFIG.BUY_SUPPORT_CATEGORY_ID,
+            CONFIG.STAFF_APPLY_CATEGORY_ID,
+            CONFIG.CONTENT_CREATOR_CATEGORY_ID,
+            CONFIG.PARTNER_CATEGORY_ID
+        ];
+        
+        for (const categoryId of categoryIds) {
+            if (!categoryId) continue;
+            const category = guild.channels.cache.get(categoryId);
+            if (!category) continue;
+            
+            const channels = category.children.cache.filter(ch => ch.type === ChannelType.GuildText);
+            count += channels.size;
+        }
+        
+        return count;
+    } catch (error) {
+        console.log('❌ Error counting tickets:', error.message);
+        return 0;
+    }
+}
+
+async function updateTicketCountVoiceChannel() {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+    
+    const voiceChannelId = CONFIG.TICKET_COUNT_VOICE_CHANNEL_ID;
+    if (!voiceChannelId) return;
+    
+    const voiceChannel = guild.channels.cache.get(voiceChannelId);
+    if (!voiceChannel) return;
+    
+    // Tel alle open tickets
+    const openTicketsCount = await countAllOpenTickets();
+    
+    // Update de voice channel naam
+    const boldNumbers = {
+        '0': '𝟎', '1': '𝟏', '2': '𝟐', '3': '𝟑', '4': '𝟒',
+        '5': '𝟓', '6': '𝟔', '7': '𝟕', '8': '𝟖', '9': '𝟗'
+    };
+    
+    const countStr = openTicketsCount.toString();
+    let boldCount = '';
+    for (const char of countStr) {
+        boldCount += boldNumbers[char] || char;
+    }
+    
+    const channelName = `𝐎𝐩𝐞𝐧 𝐓𝐢𝐜𝐤𝐞𝐭𝐬: ${boldCount}`;
+    
+    try {
+        if (voiceChannel.name !== channelName) {
+            await voiceChannel.setName(channelName);
+            console.log(`✅ Ticket count voice channel updated: ${channelName} (${openTicketsCount} open tickets)`);
+        }
+    } catch (error) {
+        console.log(`❌ Failed to update voice channel name:`, error.message);
+    }
 }
 
 // ============================================
@@ -736,44 +822,6 @@ async function updateMemberCount(guild) {
         return memberCount;
     } catch (error) {
         return 0;
-    }
-}
-
-// ============================================
-// UPDATE TICKET COUNT VOICE CHANNEL
-// ============================================
-async function updateTicketCountVoiceChannel() {
-    const guild = client.guilds.cache.first();
-    if (!guild) return;
-    
-    const voiceChannelId = CONFIG.TICKET_COUNT_VOICE_CHANNEL_ID;
-    if (!voiceChannelId) return;
-    
-    const voiceChannel = guild.channels.cache.get(voiceChannelId);
-    if (!voiceChannel) return;
-    
-    const openTicketsCount = tickets.size;
-    
-    const boldNumbers = {
-        '0': '𝟎', '1': '𝟏', '2': '𝟐', '3': '𝟑', '4': '𝟒',
-        '5': '𝟓', '6': '𝟔', '7': '𝟕', '8': '𝟖', '9': '𝟗'
-    };
-    
-    const countStr = openTicketsCount.toString();
-    let boldCount = '';
-    for (const char of countStr) {
-        boldCount += boldNumbers[char] || char;
-    }
-    
-    const channelName = `𝐎𝐩𝐞𝐧 𝐓𝐢𝐜𝐤𝐞𝐭𝐬: ${boldCount}`;
-    
-    try {
-        if (voiceChannel.name !== channelName) {
-            await voiceChannel.setName(channelName);
-            console.log(`✅ Ticket count voice channel updated: ${channelName}`);
-        }
-    } catch (error) {
-        console.log(`❌ Failed to update voice channel name:`, error.message);
     }
 }
 
